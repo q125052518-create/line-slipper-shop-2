@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>商品賣場管理</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Admin</p>
+        <h1>商品賣場管理</h1>
+      </div>
+      <nav class="header-actions">
+        <a class="admin-link is-current" href="/admin.html">商品管理</a>
+        <a class="admin-link" href="/admin-chat.html">買家聊聊</a>
+        <a class="admin-link" href="/admin-tools.html">匯入同步</a>
+        <a class="admin-link" href="/admin-orders.html">訂單後台</a>
+        <a class="admin-link" href="/">下單頁</a>
+        <button type="button" id="logoutButton">登出</button>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-grid">
+        <form id="marketForm" class="editor-panel">
+          <h2>新增賣場</h2>
+          <label>
+            賣場名稱
+            <input name="name" required>
+          </label>
+          <label>
+            賣場說明
+            <textarea name="description" rows="3"></textarea>
+          </label>
+          <label>
+            賣場封面圖
+            <span class="image-uploader">
+              <span class="image-preview empty" data-image-preview>尚未上傳</span>
+              <input type="file" name="imageFile" accept="image/*">
+              <input type="hidden" name="imageUrl">
+              <button type="button" data-clear-image>刪除圖片</button>
+            </span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="isActive" checked>
+            前台顯示
+          </label>
+          <button type="submit">新增賣場</button>
+        </form>
+
+        <section class="editor-panel">
+          <h2>新增商品</h2>
+          <form id="productForm" class="order-form">
+            <label>
+              所屬賣場
+              <select name="marketId" required></select>
+            </label>
+            <label>
+              商品名稱
+              <input name="name" placeholder="例如 雲朵厚底拖鞋" required>
+            </label>
+            <label>
+              商品圖片
+              <span class="image-uploader">
+                <span class="image-preview empty" data-image-preview>尚未上傳</span>
+                <input type="file" name="imageFile" accept="image/*">
+                <input type="hidden" name="imageUrl">
+                <button type="button" data-clear-image>刪除圖片</button>
+              </span>
+            </label>
+            <label>
+              商品說明
+              <textarea name="description" rows="3"></textarea>
+            </label>
+            <div id="newVariants" class="variant-editor"></div>
+            <button type="button" data-add-variant>新增品項</button>
+            <button type="submit">新增商品</button>
+          </form>
+        </section>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>賣場與商品資料</h2>
+          <button type="button" id="refreshCatalog">重新整理</button>
+        </div>
+        <div id="catalogEditor" class="catalog-editor"></div>
+      </section>
+    </main>
+
+    <script src="/admin-common.js"></script>
+    <script src="/admin.js"></script>
+  </body>
+</html>

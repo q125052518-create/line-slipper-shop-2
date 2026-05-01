@@ -1,0 +1,302 @@
+{
+  "markets": [
+    {
+      "id": "summer-sale",
+      "name": "夏季拖鞋賣場",
+      "description": "涼感、防滑、日常好穿的拖鞋款式。",
+      "isActive": true,
+      "products": [
+        {
+          "id": "cloud-slide",
+          "name": "雲朵厚底拖鞋",
+          "imageUrl": "https://images.unsplash.com/photo-1603487742131-4160ec999306?auto=format&fit=crop&w=900&q=80",
+          "description": "柔軟厚底，適合居家與外出。",
+          "variants": [
+            {
+              "id": "cloud-white-24",
+              "name": "白色 / 24cm",
+              "barcode": "AZ0039-1-34",
+              "imageUrl": "https://images.unsplash.com/photo-1603487742131-4160ec999306?auto=format&fit=crop&w=900&q=80",
+              "price": 390,
+              "stock": 40
+            },
+            {
+              "id": "cloud-white-25",
+              "name": "白色 / 25cm",
+              "barcode": "AZ0039-1-35",
+              "imageUrl": "https://images.unsplash.com/photo-1603487742131-4160ec999306?auto=format&fit=crop&w=900&q=80",
+              "price": 390,
+              "stock": 26
+            },
+            {
+              "id": "cloud-black-26",
+              "name": "黑色 / 26cm",
+              "barcode": "AZ0039-1-10",
+              "imageUrl": "https://images.unsplash.com/photo-1603487742131-4160ec999306?auto=format&fit=crop&w=900&q=80",
+              "price": 390,
+              "stock": 31
+            }
+          ]
+        },
+        {
+          "id": "beach-basic",
+          "name": "海灘防滑拖鞋",
+          "imageUrl": "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?auto=format&fit=crop&w=900&q=80",
+          "description": "輕量止滑，適合浴室、泳池與海邊。",
+          "variants": [
+            {
+              "id": "beach-blue-m",
+              "name": "藍色 / M",
+              "barcode": "SLP-BL-M",
+              "imageUrl": "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?auto=format&fit=crop&w=900&q=80",
+              "price": 250,
+              "stock": 15
+            },
+            {
+              "id": "beach-blue-l",
+              "name": "藍色 / L",
+              "barcode": "SLP-BL-L",
+              "imageUrl": "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?auto=format&fit=crop&w=900&q=80",
+              "price": 250,
+              "stock": 14
+            }
+          ]
+        }
+      ],
+      "imageUrl": ""
+    },
+    {
+      "id": "market-1777634373511-sgfzpq",
+      "name": "ORIGINAL拖鞋",
+      "description": "",
+      "isActive": true,
+      "products": [
+        {
+          "id": "product-1777634373511-0dymve",
+          "name": "ORIGINAL拖鞋",
+          "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcorex0tvlsd7",
+          "description": "2",
+          "variants": [
+            {
+              "id": "variant-1777634373511-ndhpx3",
+              "name": "OR黑色42-43",
+              "barcode": "AZ0202-29",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0s-mdcoxq8072o059",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-vsg3xd",
+              "name": "OR咖色42-43",
+              "barcode": "AZ0202-04",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcow5pwvpz4af",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-40c38y",
+              "name": "OR黑色36-37",
+              "barcode": "AZ0202-17",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0s-mdcoxq8072o059",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-0cgq0m",
+              "name": "OR紫色36-37",
+              "barcode": "AZ0202-23",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0k-mdcoynkbekaod9",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-p7porl",
+              "name": "OR黑色44-45",
+              "barcode": "AZ0202-30",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0s-mdcoxq8072o059",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-idimec",
+              "name": "OR白色44-45",
+              "barcode": "AZ0202-10",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0o-mdcowwhtp5ka19",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-3olonv",
+              "name": "OR灰色42-43",
+              "barcode": "AZ0202-27",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcpdqd133ggc2",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-xaw4jn",
+              "name": "OR綠色36-37",
+              "barcode": "AZ0202-11",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0h-mdcoxeg1fhwq7e",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-kdinom",
+              "name": "OR綠色38-39",
+              "barcode": "AZ0202-12",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0h-mdcoxeg1fhwq7e",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-b40dqv",
+              "name": "OR咖色38-39",
+              "barcode": "AZ0202-02",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcow5pwvpz4af",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-ose9bs",
+              "name": "OR黑色38-39",
+              "barcode": "AZ0202-18",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0s-mdcoxq8072o059",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-xn7nh5",
+              "name": "OR咖色36-37",
+              "barcode": "AZ0202-01",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcow5pwvpz4af",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-vkis1a",
+              "name": "OR粉色38-39",
+              "barcode": "AZ0202-21",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0n-mdcoyamgdpbe6d",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-xrleo2",
+              "name": "OR灰色40-41",
+              "barcode": "AZ0202-26",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcpdqd133ggc2",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-cn2a8i",
+              "name": "OR灰色44-45",
+              "barcode": "AZ0202-28",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcpdqd133ggc2",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-yc1xg4",
+              "name": "OR咖色40-41",
+              "barcode": "AZ0202-03",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcow5pwvpz4af",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-f9lbpe",
+              "name": "OR粉色36-37",
+              "barcode": "AZ0202-20",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0n-mdcoyamgdpbe6d",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-jls9vr",
+              "name": "OR白色38-39",
+              "barcode": "AZ0202-07",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0o-mdcowwhtp5ka19",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-1c94x4",
+              "name": "OR粉色40-41",
+              "barcode": "AZ0202-22",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0n-mdcoyamgdpbe6d",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-rngg54",
+              "name": "OR紫色38-39",
+              "barcode": "AZ0202-24",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0k-mdcoynkbekaod9",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-rdp6fq",
+              "name": "OR黑色40-41",
+              "barcode": "AZ0202-19",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0s-mdcoxq8072o059",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-5ptd2z",
+              "name": "OR綠色40-41",
+              "barcode": "AZ0202-13",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0h-mdcoxeg1fhwq7e",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-vdz1k0",
+              "name": "OR咖色44-45",
+              "barcode": "AZ0202-05",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0p-mdcow5pwvpz4af",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-hpbj3i",
+              "name": "OR白色36-37",
+              "barcode": "AZ0202-06",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0o-mdcowwhtp5ka19",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-63ou18",
+              "name": "OR白色42-43",
+              "barcode": "AZ0202-09",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0o-mdcowwhtp5ka19",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-r4tg5r",
+              "name": "OR紫色40-41",
+              "barcode": "AZ0202-25",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0k-mdcoynkbekaod9",
+              "price": 99,
+              "stock": 0
+            },
+            {
+              "id": "variant-1777634373511-3nm2z0",
+              "name": "OR白色40-41",
+              "barcode": "AZ0202-08",
+              "imageUrl": "https://s-cf-tw.shopeesz.com/file/tw-11134207-7ra0o-mdcowwhtp5ka19",
+              "price": 99,
+              "stock": 0
+            }
+          ]
+        }
+      ],
+      "imageUrl": ""
+    }
+  ]
+}

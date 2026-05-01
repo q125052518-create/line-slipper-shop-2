@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: line-slipper-shop-2
+    runtime: node
+    buildCommand: npm install && npx playwright install chromium
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LIFF_ID
+        sync: false
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
+      - key: MALLBIC_ACCOUNT
+        sync: false
+      - key: MALLBIC_PASSWORD
+        sync: false
+      - key: MALLBIC_COMPANY_NAME
+        value: 祥瑞華有限公司
+      - key: MALLBIC_AUTO_SYNC_ENABLED
+        value: "true"
+      - key: MALLBIC_AUTO_SYNC_INTERVAL_MS
+        value: "3600000"
+      - key: MALLBIC_ORDER_AUTO_SYNC_ENABLED
+        value: "false"
+      - key: MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS
+        value: "300000"

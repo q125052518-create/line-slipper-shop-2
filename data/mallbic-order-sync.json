@@ -1,0 +1,20 @@
+{
+  "enabled": false,
+  "intervalMs": 300000,
+  "running": false,
+  "lastTrigger": "manual",
+  "lastRunAt": "2026-05-01T14:00:07.167Z",
+  "lastFinishedAt": "2026-05-01T14:00:31.922Z",
+  "lastSuccessAt": "2026-05-01T14:00:31.922Z",
+  "lastError": "",
+  "lastResult": {
+    "pendingImport": 0,
+    "pendingCancel": 1,
+    "importedOrders": 0,
+    "importedRows": 0,
+    "sourceFile": "",
+    "cancelledOrders": 1,
+    "failedCancels": 0,
+    "errors": []
+  }
+}
