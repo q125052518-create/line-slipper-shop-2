@@ -13,6 +13,7 @@ const marketDescriptionEl = document.querySelector("#marketDescription");
 const productsEl = document.querySelector("#products");
 const messageEl = document.querySelector("#message");
 const cartCountEl = document.querySelector("#cartCount");
+let messageTimer = null;
 
 async function loadMarkets() {
   const data = await fetch("/api/markets").then((response) => response.json());
@@ -69,6 +70,16 @@ function escapeHtml(value) {
 
 function placeholderImage(name) {
   return `https://placehold.co/720x540/f2efe8/1e2720?text=${encodeURIComponent(name || "Slipper")}`;
+}
+
+function showMessage(text, type = "success") {
+  clearTimeout(messageTimer);
+  messageEl.textContent = text;
+  messageEl.classList.toggle("is-error", type === "error");
+  messageEl.classList.add("is-visible");
+  messageTimer = setTimeout(() => {
+    messageEl.classList.remove("is-visible");
+  }, 2200);
 }
 
 function renderMarketOptions() {
@@ -160,12 +171,12 @@ function addToCart(productId) {
   const addQuantity = Math.max(1, Number(quantityInput?.value || 1));
   const currentQuantity = state.cart[key]?.quantity || 0;
   if (!Number.isInteger(addQuantity) || addQuantity <= 0) {
-    messageEl.textContent = "請輸入正確數量";
+    showMessage("請輸入正確數量", "error");
     return;
   }
 
   if (currentQuantity + addQuantity > variant.stock) {
-    messageEl.textContent = `庫存不足，目前剩 ${variant.stock}`;
+    showMessage(`庫存不足，目前剩 ${variant.stock}`, "error");
     return;
   }
 
@@ -184,7 +195,7 @@ function addToCart(productId) {
   };
 
   saveCart();
-  messageEl.textContent = `${product.name} - ${variant.name} x ${addQuantity} 已加入購物車`;
+  showMessage(`${product.name} - ${variant.name} x ${addQuantity} 已加入購物車`);
 }
 
 marketSelectEl.addEventListener("change", () => {
