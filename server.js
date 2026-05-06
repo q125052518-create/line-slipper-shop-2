@@ -2563,6 +2563,10 @@ app.post("/api/orders", async (req, res) => {
     return res.status(400).json({ message: "請輸入姓名" });
   }
 
+  if (!orderPhone) {
+    return res.status(400).json({ message: "請輸入電話" });
+  }
+
   if (!["宅配", "自行取貨"].includes(cleanDeliveryMethod)) {
     return res.status(400).json({ message: "請選擇取貨方式" });
   }
