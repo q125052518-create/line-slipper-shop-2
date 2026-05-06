@@ -716,6 +716,10 @@ function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function isValidTaiwanMobile(value) {
+  return /^09\d{8}$/.test(normalizePhone(value));
+}
+
 function publicBuyerView(buyer) {
   return {
     id: buyer.id,
@@ -2565,6 +2569,10 @@ app.post("/api/orders", async (req, res) => {
 
   if (!orderPhone) {
     return res.status(400).json({ message: "請輸入電話" });
+  }
+
+  if (!isValidTaiwanMobile(orderPhone)) {
+    return res.status(400).json({ message: "請輸入正確的手機號碼，例如 0912345678" });
   }
 
   if (!["宅配", "自行取貨"].includes(cleanDeliveryMethod)) {
