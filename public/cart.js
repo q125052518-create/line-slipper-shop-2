@@ -21,7 +21,6 @@ async function initLiff() {
 
   await liff.init({ liffId: config.liffId });
   if (!liff.isLoggedIn()) {
-    liff.login();
     return;
   }
 
@@ -124,10 +123,7 @@ function renderCart() {
     return;
   }
 
-  submitButton.disabled = !state.buyer;
-  if (!state.buyer) {
-    messageEl.textContent = "請先登入買家帳號才能結帳";
-  }
+  submitButton.disabled = false;
 
   cartEl.innerHTML = items.map(([key, item]) => `
     <div class="cart-item cart-item-full">
@@ -198,12 +194,6 @@ document.addEventListener("click", (event) => {
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   messageEl.textContent = "";
-
-  if (!state.buyer) {
-    messageEl.textContent = "請先登入買家帳號才能結帳";
-    window.location.href = "/orders.html";
-    return;
-  }
 
   const items = Object.values(state.cart).map((item) => ({
     marketId: item.marketId,

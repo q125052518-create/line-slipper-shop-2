@@ -2551,13 +2551,17 @@ app.post("/api/orders/cancel", requireBuyerApi, async (req, res) => {
   res.json({ order: publicOrderView(order), message: "取消申請已送出，等待賣家同意" });
 });
 
-app.post("/api/orders", requireBuyerApi, async (req, res) => {
+app.post("/api/orders", async (req, res) => {
   const { lineUserId, customerName, phone, deliveryMethod, deliveryAddress, note, items } = req.body;
-  const buyer = req.buyer;
+  const buyer = await getBuyerFromRequest(req);
   const orderCustomerName = String(buyer?.name || customerName || "").trim();
   const orderPhone = String(buyer?.phone || phone || "").trim();
-  const cleanDeliveryMethod = String(deliveryMethod || "").trim();
+  const cleanDeliveryMethod = String(deliveryMethod || "自行取貨").trim();
   const cleanDeliveryAddress = String(deliveryAddress || "").trim();
+
+  if (!orderCustomerName) {
+    return res.status(400).json({ message: "請輸入姓名" });
+  }
 
   if (!["宅配", "自行取貨"].includes(cleanDeliveryMethod)) {
     return res.status(400).json({ message: "請選擇取貨方式" });
