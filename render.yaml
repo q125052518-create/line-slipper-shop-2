@@ -28,7 +28,7 @@ services:
       - key: MALLBIC_AUTO_SYNC_ENABLED
         value: "true"
       - key: MALLBIC_AUTO_SYNC_INTERVAL_MS
-        value: "3600000"
+        value: "600000"
       - key: MALLBIC_ORDER_AUTO_SYNC_ENABLED
         value: "true"
       - key: MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS
