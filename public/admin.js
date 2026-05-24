@@ -3,8 +3,14 @@ const marketFormEl = document.querySelector("#marketForm");
 const productFormEl = document.querySelector("#productForm");
 const newVariantsEl = document.querySelector("#newVariants");
 const refreshCatalogEl = document.querySelector("#refreshCatalog");
+const productSearchInputEl = document.querySelector("#productSearchInput");
+const productSearchCountEl = document.querySelector("#productSearchCount");
 
 let catalog = { markets: [] };
+let draggedVariantRow = null;
+let selectedProductId = "";
+let isCreatingProduct = false;
+let productSearchQuery = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -51,33 +57,36 @@ async function marketImageFromForm(form, formData) {
   return formData.get("imageUrl") || "";
 }
 
-function imagePreviewMarkup(value, emptyText = "尚未上傳") {
+function imagePreviewMarkup(value, emptyText = "尚未選擇") {
   if (!value) return `<span class="image-preview empty" data-image-preview>${emptyText}</span>`;
-  return `<span class="image-preview" data-image-preview><img src="${escapeHtml(value)}" alt="" onerror="this.parentElement.classList.add('empty'); this.parentElement.textContent='圖片無法載入';"></span>`;
+  return `<span class="image-preview" data-image-preview><img src="${escapeHtml(value)}" alt="" onerror="this.parentElement.classList.add('empty'); this.parentElement.textContent='圖片載入失敗';"></span>`;
 }
 
 function resetImageUploaders(form) {
   form.querySelectorAll(".image-uploader").forEach((uploader) => {
     uploader.querySelector('input[type="hidden"]').value = "";
     uploader.querySelector("[data-image-preview]").outerHTML =
-      '<span class="image-preview empty" data-image-preview>尚未上傳</span>';
+      '<span class="image-preview empty" data-image-preview>尚未選擇</span>';
   });
 }
 
 function variantRow(variant = {}) {
   return `
     <div class="variant-row" data-variant-row data-variant-id="${escapeHtml(variant.id || "")}">
+      <button type="button" class="drag-handle" draggable="true" data-drag-variant title="拖曳排序" aria-label="拖曳排序">
+        <span aria-hidden="true"></span>
+      </button>
       <label>
         款式
-        <input name="variantName" placeholder="例如 黑色 / 26cm" value="${escapeHtml(variant.name || "")}" required>
+        <input name="variantName" placeholder="例如 橙色 / M(40-41)" value="${escapeHtml(variant.name || "")}" required>
       </label>
       <label>
         品項條碼
-        <input name="barcode" placeholder="例如 SLP-BK-26" value="${escapeHtml(variant.barcode || "")}" required>
+        <input name="barcode" placeholder="例如 AA0077-01" value="${escapeHtml(variant.barcode || "")}" required>
       </label>
       <label>
         售價
-        <input name="price" type="number" min="0" step="1" placeholder="例如 390" value="${escapeHtml(variant.price ?? "")}" required>
+        <input name="price" type="number" min="0" step="1" placeholder="例如 89" value="${escapeHtml(variant.price ?? "")}" required>
       </label>
       <label>
         數量
@@ -97,90 +106,176 @@ function variantRow(variant = {}) {
   `;
 }
 
+function primaryMarket() {
+  return catalog.markets[0] || null;
+}
+
+function firstVariant(product) {
+  return product?.variants?.[0] || null;
+}
+
+function productTileImage(product) {
+  const variant = firstVariant(product);
+  return variant?.imageUrl || product?.imageUrl || "https://placehold.co/300x300/f2efe8/1e2720?text=Slipper";
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function productSearchText(product) {
+  return [
+    product.id,
+    product.name,
+    product.barcode,
+    ...(product.variants || []).flatMap((variant) => [
+      variant.id,
+      variant.name,
+      variant.barcode
+    ])
+  ].map(normalizeSearchText).join(" ");
+}
+
+function filteredProducts(market) {
+  const query = normalizeSearchText(productSearchQuery);
+  if (!query) return market.products;
+  const keywords = query.split(/\s+/).filter(Boolean);
+  return market.products.filter((product) => {
+    const haystack = productSearchText(product);
+    return keywords.every((keyword) => haystack.includes(keyword));
+  });
+}
+
+function updateProductSearchCount(visibleCount, totalCount) {
+  if (!productSearchCountEl) return;
+  productSearchCountEl.textContent = productSearchQuery
+    ? `${visibleCount.toLocaleString("zh-TW")} / ${totalCount.toLocaleString("zh-TW")} 件商品`
+    : `${totalCount.toLocaleString("zh-TW")} 件商品`;
+}
+
+function selectedProduct(market) {
+  if (!selectedProductId) return null;
+  return market.products.find((product) => product.id === selectedProductId) || null;
+}
+
 function renderMarketOptions() {
-  const select = productFormEl.elements.marketId;
-  select.innerHTML = catalog.markets.map((market) => `
-    <option value="${market.id}">${escapeHtml(market.name)}</option>
-  `).join("");
+  const form = document.querySelector("#productForm");
+  const field = form?.elements?.marketId;
+  if (!field) return;
+  const market = primaryMarket();
+  if (field.tagName === "SELECT") {
+    field.innerHTML = market ? `<option value="${market.id}">${escapeHtml(market.name)}</option>` : "";
+  }
+  field.value = market?.id || "";
 }
 
 function renderCatalog() {
   renderMarketOptions();
 
-  if (catalog.markets.length === 0) {
-    catalogEditorEl.innerHTML = '<p class="empty">尚未建立賣場</p>';
+  const market = primaryMarket();
+  if (!market) {
+    catalogEditorEl.innerHTML = '<p class="empty">尚未建立資料，無法新增商品</p>';
     return;
   }
 
-  catalogEditorEl.innerHTML = catalog.markets.map((market) => `
-    <article class="market-editor" data-market-id="${market.id}">
-      <form class="market-edit-form">
-        <div class="order-head">
-          <h3>${escapeHtml(market.name)}</h3>
-          <button type="button" data-delete-market="${market.id}">刪除賣場</button>
-        </div>
-        <label>
-          賣場名稱
-          <input name="name" value="${escapeHtml(market.name)}" required>
-        </label>
-        <label>
-          賣場說明
-          <textarea name="description" rows="2">${escapeHtml(market.description || "")}</textarea>
-        </label>
-        <label>
-          賣場封面圖
-          <span class="image-uploader">
-            ${imagePreviewMarkup(market.imageUrl || "")}
-            <input type="file" name="imageFile" accept="image/*">
-            <input type="hidden" name="imageUrl" value="${escapeHtml(market.imageUrl || "")}">
-            <button type="button" data-clear-image>刪除圖片</button>
-          </span>
-        </label>
-        <label class="checkbox-row">
-          <input type="checkbox" name="isActive" ${market.isActive !== false ? "checked" : ""}>
-          前台顯示
-        </label>
-        <button type="submit">儲存賣場</button>
-      </form>
+  if (isCreatingProduct) {
+    renderNewProductEditor(market);
+    return;
+  }
 
-      <div class="product-editor-list">
-        ${market.products.map((product) => `
-          <form class="product-edit-form" data-product-id="${product.id}">
-            <div class="product-edit-head">
-              <img src="${escapeHtml(product.imageUrl || "https://placehold.co/120x90/f2efe8/1e2720?text=Slipper")}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
-              <div>
-                <h4>${escapeHtml(product.name)}</h4>
-                <p>${escapeHtml(product.description || "")}</p>
-              </div>
-              <button type="button" data-delete-product="${product.id}">刪除商品</button>
-            </div>
-            <label>
-              商品名稱
-              <input name="name" value="${escapeHtml(product.name)}" required>
-            </label>
-            <label>
-              商品圖片
-              <span class="image-uploader">
-                ${imagePreviewMarkup(product.imageUrl || "")}
-                <input type="file" name="imageFile" accept="image/*">
-                <input type="hidden" name="imageUrl" value="${escapeHtml(product.imageUrl || "")}">
-                <button type="button" data-clear-image>刪除圖片</button>
-              </span>
-            </label>
-            <label>
-              商品說明
-              <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>
-            </label>
-            <div class="variant-editor">
-              ${product.variants.map((variant) => variantRow(variant)).join("")}
-            </div>
-            <button type="button" data-add-variant>新增品項</button>
-            <button type="submit">儲存商品</button>
-          </form>
-        `).join("") || '<p class="empty">這個賣場還沒有商品</p>'}
+  const product = selectedProduct(market);
+  if (!product) {
+    selectedProductId = "";
+    renderProductOverview(market);
+    return;
+  }
+
+  renderProductEditor(market, product);
+}
+
+function renderProductOverview(market) {
+  const products = filteredProducts(market);
+  updateProductSearchCount(products.length, market.products.length);
+
+  catalogEditorEl.innerHTML = `
+    <article class="market-editor" data-market-id="${market.id}">
+      <div class="admin-list-actions">
+        <button type="button" class="add-product-button" data-open-new-product>＋ 新增商品</button>
+      </div>
+      <div class="product-overview-grid admin-product-overview">
+        ${products.map((product) => `
+          <button type="button" class="product-tile admin-product-tile" data-open-admin-product="${product.id}">
+            <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
+            <strong>${escapeHtml(product.name)}</strong>
+          </button>
+        `).join("") || '<p class="empty">找不到符合條件的商品</p>'}
       </div>
     </article>
-  `).join("");
+  `;
+}
+
+function renderNewProductEditor(market) {
+  updateProductSearchCount(0, market.products.length);
+
+  catalogEditorEl.innerHTML = `
+    <article class="market-editor admin-product-detail" data-market-id="${market.id}">
+      <div class="admin-product-detail-head">
+        <button type="button" class="back-button" data-back-to-admin-products>回商品列表</button>
+      </div>
+      <form id="productForm" class="product-edit-form new-product-form" data-create-product>
+        <input type="hidden" name="marketId" value="${escapeHtml(market.id)}">
+        <h2>新增商品</h2>
+        <label>
+          商品名稱
+          <input name="name" placeholder="例如 雲朵厚底拖鞋" required>
+        </label>
+        <label>
+          商品說明
+          <textarea name="description" rows="3"></textarea>
+        </label>
+        <div class="variant-editor">
+          ${variantRow()}
+        </div>
+        <button type="button" data-add-variant>新增品項</button>
+        <button type="submit">新增商品</button>
+      </form>
+    </article>
+  `;
+}
+
+function renderProductEditor(market, product) {
+  updateProductSearchCount(1, market.products.length);
+
+  catalogEditorEl.innerHTML = `
+    <article class="market-editor admin-product-detail" data-market-id="${market.id}">
+      <div class="admin-product-detail-head">
+        <button type="button" class="back-button" data-back-to-admin-products>回商品列表</button>
+        <button type="button" data-delete-product="${product.id}">刪除商品</button>
+      </div>
+      <form class="product-edit-form" data-product-id="${product.id}">
+        <div class="product-edit-head">
+          <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
+          <div>
+            <h4>${escapeHtml(product.name)}</h4>
+            <p>${escapeHtml(product.description || "")}</p>
+          </div>
+        </div>
+        <label>
+          商品名稱
+          <input name="name" value="${escapeHtml(product.name)}" required>
+        </label>
+        <label>
+          商品說明
+          <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>
+        </label>
+        <div class="variant-editor">
+          ${product.variants.map((variant) => variantRow(variant)).join("")}
+        </div>
+        <button type="button" data-add-variant>新增選項</button>
+        <button type="submit">儲存商品</button>
+      </form>
+    </article>
+  `;
 }
 
 async function loadCatalog() {
@@ -188,7 +283,7 @@ async function loadCatalog() {
   renderCatalog();
 }
 
-marketFormEl.addEventListener("submit", async (event) => {
+marketFormEl?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(marketFormEl);
   const imageUrl = await marketImageFromForm(marketFormEl, formData);
@@ -210,42 +305,45 @@ marketFormEl.addEventListener("submit", async (event) => {
   await loadCatalog();
 });
 
-productFormEl.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(productFormEl);
-  const marketId = formData.get("marketId");
-  const imageUrl = await productImageFromForm(productFormEl, formData);
-
-  await fetch(`/api/admin/markets/${marketId}/products`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: formData.get("name"),
-      imageUrl,
-      description: formData.get("description"),
-      variants: await collectVariantsWithImages(newVariantsEl)
-    })
-  });
-
-  productFormEl.reset();
-  resetImageUploaders(productFormEl);
-  newVariantsEl.innerHTML = variantRow();
-  await loadCatalog();
-});
-
 document.addEventListener("click", async (event) => {
+  if (event.target.closest("[data-open-new-product]")) {
+    isCreatingProduct = true;
+    selectedProductId = "";
+    renderCatalog();
+    window.scrollTo({ top: catalogEditorEl.offsetTop - 16, behavior: "smooth" });
+    return;
+  }
+
+  const openProductButton = event.target.closest("[data-open-admin-product]");
+  if (openProductButton) {
+    isCreatingProduct = false;
+    selectedProductId = openProductButton.dataset.openAdminProduct;
+    renderCatalog();
+    window.scrollTo({ top: catalogEditorEl.offsetTop - 16, behavior: "smooth" });
+    return;
+  }
+
+  if (event.target.closest("[data-back-to-admin-products]")) {
+    isCreatingProduct = false;
+    selectedProductId = "";
+    renderCatalog();
+    window.scrollTo({ top: catalogEditorEl.offsetTop - 16, behavior: "smooth" });
+    return;
+  }
+
   if (event.target.matches("[data-add-variant]")) {
     const editor = event.target.closest("form").querySelector(".variant-editor");
     editor.insertAdjacentHTML("beforeend", variantRow());
   }
 
   if (event.target.matches("[data-clear-image]")) {
-    const uploader = event.target.closest(".image-uploader");
+    const row = event.target.closest("[data-variant-row]");
+    const uploader = row?.querySelector(".image-uploader") || event.target.closest(".image-uploader");
     uploader.querySelector('input[type="hidden"]').value = "";
     const fileInput = uploader.querySelector('input[type="file"]');
     fileInput.value = "";
     uploader.querySelector("[data-image-preview]").outerHTML =
-      '<span class="image-preview empty" data-image-preview>尚未上傳</span>';
+      '<span class="image-preview empty" data-image-preview>尚未選擇</span>';
   }
 
   if (event.target.matches("[data-remove-variant]")) {
@@ -258,17 +356,96 @@ document.addEventListener("click", async (event) => {
   const marketId = event.target.dataset.deleteMarket;
   if (marketId && confirm("確定刪除這個賣場？")) {
     await fetch(`/api/admin/markets/${marketId}`, { method: "DELETE" });
+    isCreatingProduct = false;
+    selectedProductId = "";
     await loadCatalog();
   }
 
   const productId = event.target.dataset.deleteProduct;
   if (productId && confirm("確定刪除這個商品？")) {
     await fetch(`/api/admin/products/${productId}`, { method: "DELETE" });
+    isCreatingProduct = false;
+    selectedProductId = "";
     await loadCatalog();
   }
 });
 
+document.addEventListener("dragstart", (event) => {
+  const handle = event.target.closest("[data-drag-variant]");
+  if (!handle) return;
+
+  draggedVariantRow = handle.closest("[data-variant-row]");
+  draggedVariantRow.classList.add("is-dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedVariantRow.dataset.variantId || "variant");
+});
+
+document.addEventListener("dragover", (event) => {
+  if (!draggedVariantRow) return;
+
+  const targetRow = event.target.closest("[data-variant-row]");
+  if (!targetRow || targetRow === draggedVariantRow) return;
+
+  const sourceEditor = draggedVariantRow.closest(".variant-editor");
+  if (targetRow.closest(".variant-editor") !== sourceEditor) return;
+
+  event.preventDefault();
+  const targetRect = targetRow.getBoundingClientRect();
+  const shouldPlaceAfter = event.clientY > targetRect.top + targetRect.height / 2;
+  sourceEditor.querySelectorAll("[data-variant-row]").forEach((row) => {
+    row.classList.remove("is-drop-before", "is-drop-after");
+  });
+  targetRow.classList.add(shouldPlaceAfter ? "is-drop-after" : "is-drop-before");
+  sourceEditor.insertBefore(draggedVariantRow, shouldPlaceAfter ? targetRow.nextSibling : targetRow);
+});
+
+document.addEventListener("drop", (event) => {
+  if (!draggedVariantRow) return;
+  event.preventDefault();
+});
+
+document.addEventListener("dragend", () => {
+  document.querySelectorAll("[data-variant-row]").forEach((row) => {
+    row.classList.remove("is-drop-before", "is-drop-after");
+  });
+  if (draggedVariantRow) draggedVariantRow.classList.remove("is-dragging");
+  draggedVariantRow = null;
+});
+
 document.addEventListener("submit", async (event) => {
+  if (event.target.matches("[data-create-product]")) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const marketId = formData.get("marketId") || primaryMarket()?.id;
+    if (!marketId) {
+      alert("尚未建立資料，無法新增商品");
+      return;
+    }
+    const imageUrl = await productImageFromForm(event.target, formData);
+
+    const response = await fetch(`/api/admin/markets/${marketId}/products`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: formData.get("name"),
+        imageUrl,
+        description: formData.get("description"),
+        variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.message || "新增商品失敗");
+      return;
+    }
+
+    isCreatingProduct = false;
+    selectedProductId = data.product?.id || "";
+    await loadCatalog();
+    return;
+  }
+
   if (event.target.matches(".market-edit-form")) {
     event.preventDefault();
     const marketId = event.target.closest("[data-market-id]").dataset.marketId;
@@ -295,7 +472,7 @@ document.addEventListener("submit", async (event) => {
     const formData = new FormData(event.target);
     const imageUrl = await productImageFromForm(event.target, formData);
 
-    await fetch(`/api/admin/products/${productId}`, {
+    const response = await fetch(`/api/admin/products/${productId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -306,6 +483,13 @@ document.addEventListener("submit", async (event) => {
       })
     });
 
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      alert(data.message || "儲存商品失敗");
+      return;
+    }
+
+    selectedProductId = productId;
     await loadCatalog();
   }
 });
@@ -322,7 +506,18 @@ document.addEventListener("change", async (event) => {
     `<span class="image-preview" data-image-preview><img src="${dataUrl}" alt=""></span>`;
 });
 
-refreshCatalogEl.addEventListener("click", loadCatalog);
+refreshCatalogEl.addEventListener("click", () => {
+  isCreatingProduct = false;
+  selectedProductId = "";
+  loadCatalog();
+});
 
-newVariantsEl.innerHTML = variantRow();
+productSearchInputEl?.addEventListener("input", () => {
+  productSearchQuery = productSearchInputEl.value;
+  isCreatingProduct = false;
+  selectedProductId = "";
+  renderCatalog();
+});
+
+if (newVariantsEl) newVariantsEl.innerHTML = variantRow();
 loadCatalog();

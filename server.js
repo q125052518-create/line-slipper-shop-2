@@ -262,7 +262,7 @@ app.post("/api/admin/chats/:buyerId/messages", requireAdminApi, async (req, res)
   res.status(201).json(publicAdminChatView(conversation));
 });
 
-app.use(["/admin.html", "/admin-chat.html", "/admin-tools.html", "/admin-orders.html"], requireAdminPage);
+app.use(["/admin.html", "/admin-chat.html", "/admin-tools.html", "/admin-orders.html", "/admin-stats.html"], requireAdminPage);
 app.use("/api/admin", requireAdminApi);
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -452,6 +452,143 @@ function normalizeCatalog(catalog) {
 
 async function readCatalog() {
   return normalizeCatalog(await readJson(catalogFile, defaultCatalog));
+}
+
+function toTaipeiDateKey(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function buildAdminStats(orders, catalog) {
+  const todayKey = toTaipeiDateKey(new Date().toISOString());
+  const statusCounts = { pending: 0, processing: 0, shipped: 0, cancelled: 0 };
+  const productSales = new Map();
+  const variantSales = new Map();
+  const dailyMap = new Map();
+  const activeOrders = orders.filter((order) => order.status !== "cancelled");
+  const cancelledOrders = orders.filter((order) => order.status === "cancelled");
+
+  for (const order of orders) {
+    const status = normalizeOrderStatus(order.status);
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+  }
+
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - offset);
+    dailyMap.set(toTaipeiDateKey(date.toISOString()), { date: toTaipeiDateKey(date.toISOString()), orders: 0, revenue: 0, quantity: 0 });
+  }
+
+  let revenue = 0;
+  let todayRevenue = 0;
+  let todayOrders = 0;
+  let soldQuantity = 0;
+
+  for (const order of activeOrders) {
+    const orderDateKey = toTaipeiDateKey(order.createdAt);
+    const orderTotal = Number(order.totalAmount || 0);
+    revenue += orderTotal;
+    if (orderDateKey === todayKey) {
+      todayRevenue += orderTotal;
+      todayOrders += 1;
+    }
+
+    const daily = dailyMap.get(orderDateKey);
+    if (daily) {
+      daily.orders += 1;
+      daily.revenue += orderTotal;
+    }
+
+    for (const item of order.items || []) {
+      const quantity = Math.max(0, Number(item.quantity || 0));
+      const subtotal = Number(item.subtotal || Number(item.price || 0) * quantity || 0);
+      soldQuantity += quantity;
+      if (daily) daily.quantity += quantity;
+
+      const productKey = item.productId || item.productName || "unknown-product";
+      const product = productSales.get(productKey) || {
+        productId: item.productId || "",
+        productName: item.productName || "未命名商品",
+        quantity: 0,
+        revenue: 0
+      };
+      product.quantity += quantity;
+      product.revenue += subtotal;
+      productSales.set(productKey, product);
+
+      const variantKey = item.variantId || `${productKey}-${item.variantName || item.barcode || "unknown-variant"}`;
+      const variant = variantSales.get(variantKey) || {
+        productId: item.productId || "",
+        productName: item.productName || "未命名商品",
+        variantId: item.variantId || "",
+        variantName: item.variantName || "未命名選項",
+        barcode: item.barcode || "",
+        quantity: 0,
+        revenue: 0
+      };
+      variant.quantity += quantity;
+      variant.revenue += subtotal;
+      variantSales.set(variantKey, variant);
+    }
+  }
+
+  const inventory = [];
+  for (const market of catalog.markets || []) {
+    for (const product of market.products || []) {
+      for (const variant of product.variants || []) {
+        inventory.push({
+          marketId: market.id || "",
+          marketName: market.name || "",
+          productId: product.id || "",
+          productName: product.name || "",
+          variantId: variant.id || "",
+          variantName: variant.name || "",
+          barcode: variant.barcode || "",
+          price: Number(variant.price || 0),
+          stock: Math.max(0, Number(variant.stock || 0)),
+          imageUrl: variant.imageUrl || product.imageUrl || ""
+        });
+      }
+    }
+  }
+
+  const totalStock = inventory.reduce((sum, item) => sum + item.stock, 0);
+  const outOfStock = inventory.filter((item) => item.stock <= 0);
+  const lowStock = inventory
+    .filter((item) => item.stock > 0 && item.stock <= 5)
+    .sort((a, b) => a.stock - b.stock || a.productName.localeCompare(b.productName, "zh-Hant"))
+    .slice(0, 30);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalOrders: orders.length,
+      activeOrders: activeOrders.length,
+      cancelledOrders: cancelledOrders.length,
+      revenue,
+      todayOrders,
+      todayRevenue,
+      soldQuantity,
+      averageOrderValue: activeOrders.length ? Math.round(revenue / activeOrders.length) : 0,
+      productCount: (catalog.markets || []).reduce((sum, market) => sum + (market.products || []).length, 0),
+      variantCount: inventory.length,
+      totalStock,
+      lowStockCount: lowStock.length,
+      outOfStockCount: outOfStock.length
+    },
+    statusCounts,
+    topProducts: [...productSales.values()].sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 10),
+    topVariants: [...variantSales.values()].sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 15),
+    lowStock,
+    outOfStock: outOfStock.slice(0, 30),
+    daily: [...dailyMap.values()]
+  };
 }
 
 async function writeCatalog(catalog) {
@@ -2472,6 +2609,11 @@ function parseActiveValue(value) {
 app.get("/api/orders", requireAdminApi, async (_req, res) => {
   const orders = await readOrders();
   res.json({ orders: orders.slice().reverse() });
+});
+
+app.get("/api/admin/stats", async (_req, res) => {
+  const [orders, catalog] = await Promise.all([readOrders(), readCatalog()]);
+  res.json(buildAdminStats(orders, catalog));
 });
 
 app.post("/api/admin/orders/:id/cancel-request/approve", async (req, res) => {

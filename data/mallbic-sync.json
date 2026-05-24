@@ -3,15 +3,15 @@
   "intervalMs": 3600000,
   "running": false,
   "lastTrigger": "auto",
-  "lastRunAt": "2026-05-01T09:47:20.776Z",
-  "lastFinishedAt": "2026-05-01T09:47:54.544Z",
-  "lastSuccessAt": "2026-05-01T09:47:54.544Z",
+  "lastRunAt": "2026-05-22T17:14:10.388Z",
+  "lastFinishedAt": "2026-05-22T17:14:45.764Z",
+  "lastSuccessAt": "2026-05-22T17:14:45.764Z",
   "lastError": "",
   "lastResult": {
-    "importedRows": 22026,
-    "updatedCount": 3,
-    "unmatchedCount": 22023,
-    "sourceFile": "祥瑞華有限公司_各倉_商品列表_260501174742.xlsx",
+    "importedRows": 21785,
+    "updatedCount": 804,
+    "unmatchedCount": 20981,
+    "sourceFile": "祥瑞華有限公司_各倉_商品列表_260523011431.xlsx",
     "sourceSheet": "商品資料"
   }
 }

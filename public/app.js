@@ -3,6 +3,7 @@ const CART_KEY = "line-slipper-cart";
 const state = {
   markets: [],
   currentMarketId: "",
+  currentProductId: "",
   selectedVariants: {},
   cart: readCart(),
   buyer: null
@@ -55,6 +56,11 @@ function currentMarket() {
   return state.markets.find((market) => market.id === state.currentMarketId);
 }
 
+function currentProduct() {
+  const market = currentMarket();
+  return market?.products.find((product) => product.id === state.currentProductId);
+}
+
 function formatMoney(value) {
   return `NT$${Number(value || 0).toLocaleString("zh-TW")}`;
 }
@@ -72,6 +78,14 @@ function placeholderImage(name) {
   return `https://placehold.co/720x540/f2efe8/1e2720?text=${encodeURIComponent(name || "Slipper")}`;
 }
 
+function variantImage(product, variant) {
+  return variant?.imageUrl || product?.imageUrl || placeholderImage(product?.name || variant?.name);
+}
+
+function firstVariant(product) {
+  return product?.variants?.[0] || null;
+}
+
 function showMessage(text, type = "success") {
   clearTimeout(messageTimer);
   messageEl.textContent = text;
@@ -83,6 +97,7 @@ function showMessage(text, type = "success") {
 }
 
 function renderMarketOptions() {
+  if (!marketSelectEl) return;
   marketSelectEl.innerHTML = state.markets.map((market) => `
     <option value="${market.id}">${escapeHtml(market.name)}</option>
   `).join("");
@@ -90,8 +105,8 @@ function renderMarketOptions() {
 }
 
 function selectedVariant(product) {
-  const selectedId = state.selectedVariants[product.id] || product.variants[0]?.id;
-  return product.variants.find((variant) => variant.id === selectedId) || product.variants[0];
+  const selectedId = state.selectedVariants[product.id] || firstVariant(product)?.id;
+  return product.variants.find((variant) => variant.id === selectedId) || firstVariant(product);
 }
 
 function renderProducts() {
@@ -99,61 +114,84 @@ function renderProducts() {
   marketDescriptionEl.textContent = market?.description || "";
 
   if (!market) {
-    productsEl.innerHTML = '<p class="empty">目前沒有可顯示的賣場</p>';
+    productsEl.innerHTML = '<p class="empty">目前沒有商品資料</p>';
     return;
   }
 
   if (market.products.length === 0) {
-    productsEl.innerHTML = '<p class="empty">這個賣場目前沒有商品</p>';
+    productsEl.innerHTML = '<p class="empty">目前還沒有商品</p>';
     return;
   }
 
+  const product = currentProduct();
+  if (product) {
+    renderProductDetail(market, product);
+    return;
+  }
+
+  renderProductOverview(market);
+}
+
+function renderProductOverview(market) {
+  productsEl.className = "product-overview-grid";
   productsEl.innerHTML = market.products.map((product) => {
-    const selected = selectedVariant(product);
-    const imageUrl = selected?.imageUrl || product.imageUrl || placeholderImage(product.name);
-    const disabled = !selected || selected.stock <= 0;
-    const loginRequired = false;
+    const variant = firstVariant(product);
+    const imageUrl = variantImage(product, variant);
 
     return `
-      <article class="product">
-        <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
-        <div class="product-body">
-          <h3>${escapeHtml(product.name)}</h3>
-          <p>${escapeHtml(product.description || "拖鞋商品")}</p>
-          <div class="variant-card-grid" role="list" aria-label="${escapeHtml(product.name)}品項">
-            ${product.variants.map((variant) => {
-              const isSelected = selected?.id === variant.id;
-              const variantImage = variant.imageUrl || product.imageUrl || placeholderImage(variant.name);
-              return `
-                <button
-                  type="button"
-                  class="variant-card ${isSelected ? "is-selected" : ""}"
-                  data-select-variant="${product.id}"
-                  data-variant-id="${variant.id}"
-                  ${variant.stock <= 0 ? "data-sold-out=\"true\"" : ""}
-                >
-                  <img src="${escapeHtml(variantImage)}" alt="${escapeHtml(variant.name)}">
-                  <span>${escapeHtml(variant.name)}</span>
-                  <small>${escapeHtml(variant.barcode)}</small>
-                  <strong>${formatMoney(variant.price)}</strong>
-                  <em>庫存 ${variant.stock}</em>
-                </button>
-              `;
-            }).join("")}
-          </div>
-        </div>
-        <div class="product-actions">
-          <strong data-price-line="${product.id}">${formatMoney(selected?.price || 0)}</strong>
-          <p class="stock-line" data-stock-line="${product.id}">庫存：${selected?.stock ?? 0}</p>
-          <label class="quantity-field">
-            數量
-            <input type="number" min="1" max="${selected?.stock || 1}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
-          </label>
-          <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "售完" : loginRequired ? "登入後加入購物車" : "加入購物車"}</button>
-        </div>
-      </article>
+      <button type="button" class="product-tile" data-open-product="${product.id}">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
+        <strong>${escapeHtml(product.name)}</strong>
+      </button>
     `;
   }).join("");
+}
+
+function renderProductDetail(market, product) {
+  const selected = selectedVariant(product);
+  const imageUrl = variantImage(product, selected);
+  const disabled = !selected || selected.stock <= 0;
+
+  productsEl.className = "product-detail-wrap";
+  productsEl.innerHTML = `
+    <button type="button" class="back-button" data-back-to-products>回商品列表</button>
+    <article class="product product-detail">
+      <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
+      <div class="product-body">
+        <h3>${escapeHtml(product.name)}</h3>
+        ${product.description ? `<p>${escapeHtml(product.description)}</p>` : ""}
+        <div class="variant-card-grid" role="list" aria-label="${escapeHtml(product.name)}選項">
+          ${product.variants.map((variant) => {
+            const isSelected = selected?.id === variant.id;
+            return `
+              <button
+                type="button"
+                class="variant-card ${isSelected ? "is-selected" : ""}"
+                data-select-variant="${product.id}"
+                data-variant-id="${variant.id}"
+                ${variant.stock <= 0 ? "data-sold-out=\"true\"" : ""}
+              >
+                <img src="${escapeHtml(variantImage(product, variant))}" alt="${escapeHtml(variant.name)}">
+                <span>${escapeHtml(variant.name)}</span>
+                <small>${escapeHtml(variant.barcode)}</small>
+                <strong>${formatMoney(variant.price)}</strong>
+                <em>庫存 ${variant.stock}</em>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </div>
+      <div class="product-actions">
+        <strong data-price-line="${product.id}">${formatMoney(selected?.price || 0)}</strong>
+        <p class="stock-line" data-stock-line="${product.id}">庫存 ${selected?.stock ?? 0}</p>
+        <label class="quantity-field">
+          數量
+          <input type="number" min="1" max="${selected?.stock || 1}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
+        </label>
+        <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "缺貨" : "加入購物車"}</button>
+      </div>
+    </article>
+  `;
 }
 
 function cartKey(marketId, productId, variantId) {
@@ -198,13 +236,33 @@ function addToCart(productId) {
   showMessage(`${product.name} - ${variant.name} x ${addQuantity} 已加入購物車`);
 }
 
-marketSelectEl.addEventListener("change", () => {
+marketSelectEl?.addEventListener("change", () => {
   state.currentMarketId = marketSelectEl.value;
+  state.currentProductId = "";
   state.selectedVariants = {};
   renderProducts();
 });
 
 document.addEventListener("click", (event) => {
+  const openProductButton = event.target.closest("[data-open-product]");
+  if (openProductButton) {
+    const productId = openProductButton.dataset.openProduct;
+    const market = currentMarket();
+    const product = market?.products.find((entry) => entry.id === productId);
+    state.currentProductId = productId;
+    if (product) state.selectedVariants[productId] = selectedVariant(product)?.id;
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  if (event.target.closest("[data-back-to-products]")) {
+    state.currentProductId = "";
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
   const variantButton = event.target.closest("[data-select-variant]");
   if (variantButton) {
     state.selectedVariants[variantButton.dataset.selectVariant] = variantButton.dataset.variantId;

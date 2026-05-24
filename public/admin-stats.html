@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>數據統計</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Admin Stats</p>
+        <h1>數據統計</h1>
+      </div>
+      <nav class="header-actions">
+        <a class="admin-link" href="/admin.html">商品管理</a>
+        <a class="admin-link is-current" href="/admin-stats.html">數據統計</a>
+        <a class="admin-link" href="/admin-chat.html">聊聊</a>
+        <a class="admin-link" href="/admin-tools.html">匯入工具</a>
+        <a class="admin-link" href="/admin-orders.html">訂單後台</a>
+        <a class="admin-link" href="/">前台</a>
+        <button type="button" id="logoutButton">登出</button>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section>
+        <div class="section-head">
+          <h2>營運總覽</h2>
+          <button type="button" id="refreshStatsButton">重新整理</button>
+        </div>
+        <div id="statsSummary" class="stats-summary"></div>
+      </section>
+
+      <section class="stats-layout">
+        <article class="stats-panel">
+          <h2>近 14 天</h2>
+          <div id="dailyStats" class="daily-stats"></div>
+        </article>
+        <article class="stats-panel">
+          <h2>訂單狀態</h2>
+          <div id="statusStats" class="status-stats"></div>
+        </article>
+      </section>
+
+      <section class="stats-layout">
+        <article class="stats-panel">
+          <h2>商品銷量排行</h2>
+          <div id="topProducts" class="stats-table"></div>
+        </article>
+        <article class="stats-panel">
+          <h2>選項銷量排行</h2>
+          <div id="topVariants" class="stats-table"></div>
+        </article>
+      </section>
+
+      <section class="stats-layout">
+        <article class="stats-panel">
+          <h2>低庫存</h2>
+          <div id="lowStock" class="stats-table"></div>
+        </article>
+        <article class="stats-panel">
+          <h2>缺貨</h2>
+          <div id="outOfStock" class="stats-table"></div>
+        </article>
+      </section>
+
+      <p id="statsMessage" class="message"></p>
+    </main>
+
+    <script src="/admin-common.js"></script>
+    <script src="/admin-stats.js"></script>
+  </body>
+</html>
