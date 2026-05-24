@@ -41,6 +41,8 @@ function renderMallbicSyncStatus(status) {
 function renderMallbicOrderSyncStatus(status) {
   const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
   const mode = status.enabled ? `自動同步：每 ${intervalMinutes} 分鐘` : "自動同步：未啟用";
+  const statusIntervalMinutes = Math.round(Number(status.statusUpdateIntervalMs || status.intervalMs || 0) / 60000);
+  const statusMode = status.statusUpdateAutoEnabled ? `???????? ${statusIntervalMinutes} ??` : "??????????";
   const pending = `待匯入 ${status.pendingImport || 0} 筆｜待取消 ${status.pendingCancel || 0} 筆｜待狀態更新 ${status.pendingStatusUpdate || 0} 筆`;
   const running = status.running || status.statusUpdateRunning ? "目前正在同步中。" : "";
   const success = `最後成功：${formatDateTime(status.lastSuccessAt)}`;
@@ -53,7 +55,7 @@ function renderMallbicOrderSyncStatus(status) {
     : "";
   const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
   const statusError = status.lastStatusError ? `狀態更新錯誤：${status.lastStatusError}` : "";
-  mallbicOrderSyncStatusEl.textContent = [mode, pending, success, finished, result, statusResult, running, error, statusError].filter(Boolean).join("｜");
+  mallbicOrderSyncStatusEl.textContent = [mode, statusMode, pending, success, finished, result, statusResult, running, error, statusError].filter(Boolean).join("｜");
 }
 
 async function loadMallbicSyncStatus() {

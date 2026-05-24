@@ -31,8 +31,8 @@ const mallbicNavTimeoutMs = Number(process.env.MALLBIC_NAV_TIMEOUT_MS || 60000);
 const mallbicExportTimeoutMs = Number(process.env.MALLBIC_EXPORT_TIMEOUT_MS || 600000);
 const mallbicAutoSyncEnabled = parseEnvFlag(process.env.MALLBIC_AUTO_SYNC_ENABLED, true);
 const mallbicAutoSyncIntervalMs = Math.max(60000, Number(process.env.MALLBIC_AUTO_SYNC_INTERVAL_MS || 60 * 60 * 1000));
-const mallbicOrderAutoSyncEnabled = parseEnvFlag(process.env.MALLBIC_ORDER_AUTO_SYNC_ENABLED, false);
-const mallbicOrderAutoSyncIntervalMs = Math.max(60000, Number(process.env.MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS || 5 * 60 * 1000));
+const mallbicOrderAutoSyncEnabled = true;
+const mallbicOrderAutoSyncIntervalMs = Math.max(10 * 60 * 1000, Number(process.env.MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS || 10 * 60 * 1000));
 let mallbicSyncRunning = false;
 let mallbicOrderSyncRunning = false;
 let mallbicOrderStatusSyncRunning = false;
@@ -623,7 +623,9 @@ async function readMallbicOrderSyncStatus() {
     ...await readJson(mallbicOrderSyncFile, defaultMallbicOrderSyncStatus),
     enabled: mallbicOrderAutoSyncEnabled,
     intervalMs: mallbicOrderAutoSyncIntervalMs,
-    running: mallbicOrderSyncRunning
+    running: mallbicOrderSyncRunning,
+    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled,
+    statusUpdateIntervalMs: mallbicOrderAutoSyncIntervalMs
   };
 }
 
@@ -633,7 +635,9 @@ async function writeMallbicOrderSyncStatus(status) {
     ...status,
     enabled: mallbicOrderAutoSyncEnabled,
     intervalMs: mallbicOrderAutoSyncIntervalMs,
-    running: typeof status.running === "boolean" ? status.running : mallbicOrderSyncRunning
+    running: typeof status.running === "boolean" ? status.running : mallbicOrderSyncRunning,
+    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled,
+    statusUpdateIntervalMs: mallbicOrderAutoSyncIntervalMs
   };
   await writeJson(mallbicOrderSyncFile, nextStatus);
   return nextStatus;
@@ -2889,8 +2893,8 @@ function startMallbicOrderAutoSync() {
   console.log(`Mallbic order sync enabled. Interval: ${intervalMinutes} minutes.`);
 
   const runAutoSync = async () => {
-    if (mallbicOrderSyncRunning) {
-      console.log("Mallbic order sync skipped because another sync is running.");
+    if (mallbicOrderSyncRunning || mallbicOrderStatusSyncRunning) {
+      console.log("Mallbic order sync skipped because another order task is running.");
       return;
     }
 
@@ -2899,6 +2903,18 @@ function startMallbicOrderAutoSync() {
       console.log(`Mallbic order sync finished. Imported ${result.importedOrders} orders, cancelled ${result.cancelledOrders} orders.`);
     } catch (error) {
       console.error("Mallbic order sync failed:", error);
+    }
+
+    if (mallbicOrderSyncRunning || mallbicOrderStatusSyncRunning) {
+      console.log("Mallbic order status sync skipped because another order task is running.");
+      return;
+    }
+
+    try {
+      const result = await runMallbicOrderStatusSync("auto");
+      console.log(`Mallbic order status sync finished. Checked ${result.checkedOrders} orders, updated ${result.updatedOrders} orders.`);
+    } catch (error) {
+      console.error("Mallbic order status sync failed:", error);
     }
   };
 
