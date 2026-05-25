@@ -2874,7 +2874,7 @@ function startMallbicAutoSync() {
     }
   };
 
-  setTimeout(runAutoSync, mallbicAutoSyncIntervalMs);
+  setTimeout(runAutoSync, 30 * 1000);
   setInterval(runAutoSync, mallbicAutoSyncIntervalMs);
 }
 
@@ -2918,7 +2918,7 @@ function startMallbicOrderAutoSync() {
     }
   };
 
-  setTimeout(runAutoSync, mallbicOrderAutoSyncIntervalMs);
+  setTimeout(runAutoSync, 30 * 1000);
   setInterval(runAutoSync, mallbicOrderAutoSyncIntervalMs);
 }
 
