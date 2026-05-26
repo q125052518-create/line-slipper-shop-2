@@ -953,7 +953,7 @@ select {
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 42px minmax(220px, 1fr) 150px 88px 88px minmax(420px, 520px) 60px;
+  grid-template-columns: 42px minmax(220px, 1fr) 150px 96px 96px minmax(420px, 520px) 60px;
   max-width: 1340px;
   padding: 8px 10px;
   position: relative;

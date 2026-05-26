@@ -97,6 +97,10 @@ function cartItemAvailableStock(cartItem, variant) {
   return cartItem.orderType === "box" ? Number(variant.boxStock || 0) : Number(variant.stock || 0);
 }
 
+function cartItemPrice(cartItem, variant) {
+  return cartItem.orderType === "box" ? Number(variant.boxPrice || 0) : Number(variant.price || 0);
+}
+
 function refreshCartFromCatalog() {
   for (const [key, cartItem] of Object.entries(state.cart)) {
     const found = findCatalogItem(cartItem);
@@ -118,7 +122,7 @@ function refreshCartFromCatalog() {
       productName: found.product.name,
       variantName: found.variant.name,
       barcode: found.variant.barcode,
-      price: found.variant.price,
+      price: cartItemPrice(cartItem, found.variant),
       stock: availableStock,
       imageUrl: found.variant.imageUrl || found.product.imageUrl,
       quantity: Math.min(cartItem.quantity, availableStock)

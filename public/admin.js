@@ -40,6 +40,7 @@ async function collectVariantsWithImages(container) {
       name: row.querySelector('[name="variantName"]').value,
       barcode: row.querySelector('[name="barcode"]').value,
       price: Number(row.querySelector('[name="price"]').value),
+      boxPrice: Number(row.querySelector('[name="boxPrice"]').value),
       stock: Number(row.querySelector('[name="stock"]').value),
       boxStock: Number(row.querySelector('[name="boxStock"]').value),
       imageUrl: file ? await readFileAsDataUrl(file) : row.querySelector('[name="variantImageUrl"]').value
@@ -86,9 +87,13 @@ function variantRow(variant = {}) {
         品項條碼
         <input name="barcode" placeholder="例如 AA0077-01" value="${escapeHtml(variant.barcode || "")}" required>
       </label>
-      <label>
-        售價
-        <input name="price" type="number" min="0" step="1" placeholder="例如 89" value="${escapeHtml(variant.price ?? "")}" required>
+      <label data-stock-field="loose">
+        ????
+        <input name="price" type="number" min="0" step="1" placeholder="????" value="${escapeHtml(variant.price ?? "")}" required>
+      </label>
+      <label data-stock-field="box">
+        ????
+        <input name="boxPrice" type="number" min="0" step="1" placeholder="????" value="${escapeHtml(variant.boxPrice ?? variant.price ?? "")}" required>
       </label>
       <label data-stock-field="loose">
         散貨庫存

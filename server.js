@@ -443,8 +443,14 @@ function normalizeCatalog(catalog) {
       product.boxEnabled = product.boxEnabled === true;
       product.variants = Array.isArray(product.variants) ? product.variants : [];
       for (const variant of product.variants) {
+        const price = Number(variant.price);
+        const boxPrice = Number(variant.boxPrice);
         const stock = Number(variant.stock);
         const boxStock = Number(variant.boxStock);
+        variant.price = Number.isFinite(price) && price >= 0 ? Math.round(price) : 0;
+  if (!Number.isFinite(boxPrice) || boxPrice < 0) throw new Error("Invalid box price");
+  if (!Number.isFinite(boxPrice) || boxPrice < 0) throw new Error("?????????");
+        variant.boxPrice = Number.isFinite(boxPrice) && boxPrice >= 0 ? Math.round(boxPrice) : variant.price;
         variant.stock = Number.isInteger(stock) && stock >= 0 ? stock : 0;
         variant.boxStock = Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0;
         variant.imageUrl = String(variant.imageUrl || "").trim();
@@ -478,6 +484,10 @@ function orderItemUsesBoxStock(item) {
 
 function orderItemAvailableStock(item, variant) {
   return orderItemUsesBoxStock(item) ? Number(variant.boxStock || 0) : Number(variant.stock || 0);
+}
+
+function orderItemPrice(item, variant) {
+  return orderItemUsesBoxStock(item) ? Number(variant.boxPrice || 0) : Number(variant.price || 0);
 }
 
 function adjustOrderItemStock(item, variant, delta) {
@@ -833,6 +843,7 @@ function normalizeVariant(input, existingId) {
   const barcode = String(input.barcode || "").trim();
   const imageUrl = String(input.imageUrl || "").trim();
   const price = Number(input.price);
+  const boxPrice = Number(input.boxPrice);
   const stock = Number(input.stock);
   const boxStock = Number(input.boxStock);
 
@@ -848,6 +859,7 @@ function normalizeVariant(input, existingId) {
     barcode,
     imageUrl,
     price: Math.round(price),
+    boxPrice: Math.round(boxPrice),
     stock,
     boxStock
   };
@@ -1852,6 +1864,7 @@ app.post("/api/admin/products/import", async (req, res) => {
     if (variant) {
       variant.name = item.variantName;
       variant.price = item.price;
+      variant.boxPrice = Number(variant.boxPrice || item.price);
       variant.stock = item.stock;
       variant.boxStock = Number(variant.boxStock || 0);
       variant.imageUrl = item.variantImageUrl || variant.imageUrl || "";
@@ -1863,6 +1876,7 @@ app.post("/api/admin/products/import", async (req, res) => {
         barcode: item.barcode,
         imageUrl: item.variantImageUrl,
         price: item.price,
+        boxPrice: item.price,
         stock: item.stock,
         boxStock: 0
       });
@@ -2826,6 +2840,7 @@ app.post("/api/orders", async (req, res) => {
       const stockType = effectiveOrderItemStockType(item, found.product);
       const usesBoxStock = orderItemUsesBoxStock(item);
       const availableStock = found.variant ? orderItemAvailableStock(item, found.variant) : 0;
+      const price = found.variant ? orderItemPrice(item, found.variant) : 0;
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
       if (usesBoxStock && found.product.boxEnabled !== true) throw new Error("Box ordering is not enabled for this product");
@@ -2848,9 +2863,9 @@ app.post("/api/orders", async (req, res) => {
         variantName: found.variant.name,
         variantImageUrl: found.variant.imageUrl || found.product.imageUrl || "",
         barcode: found.variant.barcode,
-        price: found.variant.price,
+        price,
         quantity,
-        subtotal: found.variant.price * quantity
+        subtotal: price * quantity
       };
     });
   } catch (error) {
