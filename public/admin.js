@@ -11,6 +11,7 @@ let draggedVariantRow = null;
 let selectedProductId = "";
 let isCreatingProduct = false;
 let productSearchQuery = "";
+let adminInventoryMode = "loose";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -40,6 +41,7 @@ async function collectVariantsWithImages(container) {
       barcode: row.querySelector('[name="barcode"]').value,
       price: Number(row.querySelector('[name="price"]').value),
       stock: Number(row.querySelector('[name="stock"]').value),
+      boxStock: Number(row.querySelector('[name="boxStock"]').value),
       imageUrl: file ? await readFileAsDataUrl(file) : row.querySelector('[name="variantImageUrl"]').value
     };
   }));
@@ -88,9 +90,13 @@ function variantRow(variant = {}) {
         售價
         <input name="price" type="number" min="0" step="1" placeholder="例如 89" value="${escapeHtml(variant.price ?? "")}" required>
       </label>
-      <label>
-        數量
-        <input name="stock" type="number" min="0" step="1" placeholder="庫存" value="${escapeHtml(variant.stock ?? 0)}" required>
+      <label data-stock-field="loose">
+        散貨庫存
+        <input name="stock" type="number" min="0" step="1" placeholder="散貨庫存" value="${escapeHtml(variant.stock ?? 0)}" required>
+      </label>
+      <label data-stock-field="box">
+        整箱庫存
+        <input name="boxStock" type="number" min="0" step="1" placeholder="整箱庫存" value="${escapeHtml(variant.boxStock ?? 0)}" required>
       </label>
       <label>
         品項圖片
@@ -255,7 +261,7 @@ function renderNewProductEditor(market) {
       <div class="admin-product-detail-head">
         <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
       </div>
-      <form id="productForm" class="product-edit-form new-product-form" data-create-product>
+      <form id="productForm" class="product-edit-form new-product-form" data-create-product data-inventory-mode="${adminInventoryMode}">
         <input type="hidden" name="marketId" value="${escapeHtml(market.id)}">
         <h2>新增商品</h2>
         <label>
@@ -286,9 +292,13 @@ function renderProductEditor(market, product) {
         <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
         <button type="button" data-delete-product="${product.id}">刪除商品</button>
       </div>
-      <form class="product-edit-form" data-product-id="${product.id}">
+      <form class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
         <div class="product-edit-head">
           <span class="product-image-wrap">
+            <span class="inventory-mode-switch" aria-label="庫存模式">
+              <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
+              <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
+            </span>
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
             <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
           </span>
@@ -344,6 +354,18 @@ marketFormEl?.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("click", async (event) => {
+  const inventoryModeButton = event.target.closest("[data-admin-inventory-mode]");
+  if (inventoryModeButton) {
+    adminInventoryMode = inventoryModeButton.dataset.adminInventoryMode === "box" ? "box" : "loose";
+    document.querySelectorAll(".product-edit-form").forEach((form) => {
+      form.dataset.inventoryMode = adminInventoryMode;
+    });
+    document.querySelectorAll("[data-admin-inventory-mode]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.adminInventoryMode === adminInventoryMode);
+    });
+    return;
+  }
+
   if (event.target.closest("[data-open-new-product]")) {
     isCreatingProduct = true;
     selectedProductId = "";

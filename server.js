@@ -443,7 +443,10 @@ function normalizeCatalog(catalog) {
       product.variants = Array.isArray(product.variants) ? product.variants : [];
       for (const variant of product.variants) {
         const stock = Number(variant.stock);
+        const boxStock = Number(variant.boxStock);
         variant.stock = Number.isInteger(stock) && stock >= 0 ? stock : 0;
+  if (!Number.isInteger(boxStock) || boxStock < 0) throw new Error("?????????");
+        variant.boxStock = Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0;
         variant.imageUrl = String(variant.imageUrl || "").trim();
       }
     }
@@ -467,6 +470,22 @@ function effectiveOrderItemStockType(item, product) {
   if (normalizeOrderType(item?.orderType) === "box") return "preOrder";
   if (item?.stockType === "preOrder") return "preOrder";
   return normalizeProductStockType(product?.stockType);
+}
+
+function orderItemUsesBoxStock(item) {
+  return normalizeOrderType(item?.orderType) === "box";
+}
+
+function orderItemAvailableStock(item, variant) {
+  return orderItemUsesBoxStock(item) ? Number(variant.boxStock || 0) : Number(variant.stock || 0);
+}
+
+function adjustOrderItemStock(item, variant, delta) {
+  if (orderItemUsesBoxStock(item)) {
+    variant.boxStock = Math.max(0, Number(variant.boxStock || 0) + delta);
+  } else {
+    variant.stock = Math.max(0, Number(variant.stock || 0) + delta);
+  }
 }
 
 async function readCatalog() {
@@ -815,6 +834,7 @@ function normalizeVariant(input, existingId) {
   const imageUrl = String(input.imageUrl || "").trim();
   const price = Number(input.price);
   const stock = Number(input.stock);
+  const boxStock = Number(input.boxStock);
 
   if (!name) throw new Error("請填寫品項名稱");
   if (!barcode) throw new Error("請填寫品項條碼");
@@ -827,7 +847,8 @@ function normalizeVariant(input, existingId) {
     barcode,
     imageUrl,
     price: Math.round(price),
-    stock
+    stock,
+    boxStock
   };
 }
 
@@ -1118,9 +1139,10 @@ function restoreOrderStock(catalog, order) {
 
   let restoredCount = 0;
   for (const item of order.items || []) {
+    if (item.stockType === "preOrder" && item.stockSource !== "box") continue;
     const { variant } = findCatalogItemAnyStatus(catalog, item.marketId, item.productId, item.variantId);
     if (!variant) continue;
-    variant.stock = Number(variant.stock || 0) + Number(item.quantity || 0);
+    adjustOrderItemStock(item, variant, Number(item.quantity || 0));
     restoredCount += Number(item.quantity || 0);
   }
 
@@ -1827,6 +1849,7 @@ app.post("/api/admin/products/import", async (req, res) => {
       variant.name = item.variantName;
       variant.price = item.price;
       variant.stock = item.stock;
+      variant.boxStock = Number(variant.boxStock || 0);
       variant.imageUrl = item.variantImageUrl || variant.imageUrl || "";
       updatedVariants += 1;
     } else {
@@ -1836,7 +1859,8 @@ app.post("/api/admin/products/import", async (req, res) => {
         barcode: item.barcode,
         imageUrl: item.variantImageUrl,
         price: item.price,
-        stock: item.stock
+        stock: item.stock,
+        boxStock: 0
       });
       createdVariants += 1;
     }
@@ -2796,11 +2820,13 @@ app.post("/api/orders", async (req, res) => {
       const quantity = Number(item.quantity);
       const found = findCatalogItem(catalog, item.marketId, item.productId, item.variantId);
       const stockType = effectiveOrderItemStockType(item, found.product);
+      const usesBoxStock = orderItemUsesBoxStock(item);
+      const availableStock = found.variant ? orderItemAvailableStock(item, found.variant) : 0;
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
       if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("數量不正確");
-      if (stockType !== "preOrder" && found.variant.stock < quantity) {
-        throw new Error(`${found.product.name} - ${found.variant.name} 庫存不足，目前剩 ${found.variant.stock}`);
+      if ((usesBoxStock || stockType !== "preOrder") && availableStock < quantity) {
+        throw new Error(`${found.product.name} - ${found.variant.name} 庫存不足，目前剩 ${availableStock}`);
       }
 
       return {
@@ -2810,6 +2836,7 @@ app.post("/api/orders", async (req, res) => {
         orderTypeLabel: orderTypeLabel(item.orderType),
         stockType,
         stockTypeLabel: stockType === "preOrder" ? "預購" : "現貨",
+        stockSource: usesBoxStock ? "box" : "loose",
         productId: found.product.id,
         productName: found.product.name,
         variantId: found.variant.id,
@@ -2826,9 +2853,9 @@ app.post("/api/orders", async (req, res) => {
   }
 
   for (const item of normalizedItems) {
-    if (item.stockType === "preOrder") continue;
+    if (item.stockType === "preOrder" && item.stockSource !== "box") continue;
     const { variant } = findCatalogItem(catalog, item.marketId, item.productId, item.variantId);
-    variant.stock -= item.quantity;
+    adjustOrderItemStock(item, variant, -Number(item.quantity || 0));
   }
   await writeCatalog(catalog);
 

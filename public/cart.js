@@ -93,11 +93,16 @@ function cartItemIsPreOrder(cartItem, product) {
   return cartItem.orderType === "box" || product?.stockType === "preOrder" || cartItem.stockType === "preOrder";
 }
 
+function cartItemAvailableStock(cartItem, variant) {
+  return cartItem.orderType === "box" ? Number(variant.boxStock || 0) : Number(variant.stock || 0);
+}
+
 function refreshCartFromCatalog() {
   for (const [key, cartItem] of Object.entries(state.cart)) {
     const found = findCatalogItem(cartItem);
     const isPreOrder = found && cartItemIsPreOrder(cartItem, found.product);
-    if (!found || (!isPreOrder && found.variant.stock <= 0)) {
+    const availableStock = found ? cartItemAvailableStock(cartItem, found.variant) : 0;
+    if (!found || availableStock <= 0) {
       delete state.cart[key];
       continue;
     }
@@ -109,13 +114,14 @@ function refreshCartFromCatalog() {
       orderTypeLabel: cartItem.orderType === "box" ? "整箱訂購" : "散貨訂購",
       stockType: isPreOrder ? "preOrder" : "inStock",
       stockTypeLabel: isPreOrder ? "預購" : "現貨",
+      stockSource: cartItem.orderType === "box" ? "box" : "loose",
       productName: found.product.name,
       variantName: found.variant.name,
       barcode: found.variant.barcode,
       price: found.variant.price,
-      stock: found.variant.stock,
+      stock: availableStock,
       imageUrl: found.variant.imageUrl || found.product.imageUrl,
-      quantity: isPreOrder ? cartItem.quantity : Math.min(cartItem.quantity, found.variant.stock)
+      quantity: Math.min(cartItem.quantity, availableStock)
     };
   }
   saveCart();
@@ -148,7 +154,7 @@ function renderCart() {
       <div class="quantity">
         <button type="button" data-minus="${key}">-</button>
         <span>${item.quantity}</span>
-        <button type="button" data-plus="${key}" ${item.stockType !== "preOrder" && item.quantity >= item.stock ? "disabled" : ""}>+</button>
+        <button type="button" data-plus="${key}" ${item.quantity >= item.stock ? "disabled" : ""}>+</button>
       </div>
       <button type="button" data-remove="${key}">移除</button>
     </div>
@@ -169,7 +175,7 @@ function changeQuantity(key, delta) {
   const next = item.quantity + delta;
   if (next <= 0) {
     delete state.cart[key];
-  } else if (item.stockType === "preOrder" || next <= item.stock) {
+  } else if (next <= item.stock) {
     item.quantity = next;
   } else {
     messageEl.textContent = `庫存不足，目前剩 ${item.stock}`;
@@ -210,6 +216,7 @@ formEl.addEventListener("submit", async (event) => {
     marketId: item.marketId,
     orderType: item.orderType === "box" ? "box" : "loose",
     stockType: item.stockType === "preOrder" ? "preOrder" : "inStock",
+    stockSource: item.orderType === "box" ? "box" : "loose",
     productId: item.productId,
     variantId: item.variantId,
     quantity: item.quantity

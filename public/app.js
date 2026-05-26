@@ -104,6 +104,10 @@ function productStockLabel(product) {
   return effectiveProductStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
+function variantDisplayStock(variant) {
+  return state.orderType === "box" ? Number(variant?.boxStock || 0) : Number(variant?.stock || 0);
+}
+
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
     const rankA = effectiveProductStockType(a) === "preOrder" ? 0 : 1;
@@ -211,7 +215,8 @@ function renderProductDetail(market, product) {
   const selected = selectedVariant(product);
   const imageUrl = variantImage(product, selected);
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
-  const disabled = !selected || (!isPreOrder && selected.stock <= 0);
+  const selectedStock = variantDisplayStock(selected);
+  const disabled = !selected || selectedStock <= 0;
 
   productsEl.className = "product-detail-wrap";
   productsEl.innerHTML = `
@@ -233,13 +238,13 @@ function renderProductDetail(market, product) {
                 class="variant-card ${isSelected ? "is-selected" : ""}"
                 data-select-variant="${product.id}"
                 data-variant-id="${variant.id}"
-                ${!isPreOrder && variant.stock <= 0 ? "data-sold-out=\"true\"" : ""}
+                ${variantDisplayStock(variant) <= 0 ? "data-sold-out=\"true\"" : ""}
               >
                 <img src="${escapeHtml(variantImage(product, variant))}" alt="${escapeHtml(variant.name)}">
                 <span>${escapeHtml(variant.name)}</span>
                 <small>${escapeHtml(variant.barcode)}</small>
                 <strong>${formatMoney(variant.price)}</strong>
-                <em>庫存 ${variant.stock}</em>
+                <em>${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${variantDisplayStock(variant)}</em>
               </button>
             `;
           }).join("")}
@@ -247,10 +252,10 @@ function renderProductDetail(market, product) {
       </div>
       <div class="product-actions">
         <strong data-price-line="${product.id}">${formatMoney(selected?.price || 0)}</strong>
-        <p class="stock-line" data-stock-line="${product.id}">庫存 ${selected?.stock ?? 0}</p>
+        <p class="stock-line" data-stock-line="${product.id}">${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}</p>
         <label class="quantity-field">
           數量
-          <input type="number" min="1" max="${selected?.stock || 1}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
+          <input type="number" min="1" max="${selectedStock || 1}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
         </label>
         <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "缺貨" : "加入購物車"}</button>
       </div>
@@ -269,7 +274,8 @@ function addToCart(productId) {
   const product = market?.products.find((entry) => entry.id === productId);
   const variant = product ? selectedVariant(product) : null;
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
-  if (!market || !product || !variant || (!isPreOrder && variant.stock <= 0)) return;
+  const availableStock = variantDisplayStock(variant);
+  if (!market || !product || !variant || availableStock <= 0) return;
 
   const key = cartKey(market.id, product.id, variant.id);
   const quantityInput = document.querySelector(`[data-add-quantity="${product.id}"]`);
@@ -280,8 +286,8 @@ function addToCart(productId) {
     return;
   }
 
-  if (!isPreOrder && currentQuantity + addQuantity > variant.stock) {
-    showMessage(`庫存不足，目前剩 ${variant.stock}`, "error");
+  if (currentQuantity + addQuantity > availableStock) {
+    showMessage(`庫存不足，目前剩 ${availableStock}`, "error");
     return;
   }
 
@@ -292,13 +298,14 @@ function addToCart(productId) {
     orderTypeLabel: orderTypeLabel(),
     stockType: effectiveProductStockType(product),
     stockTypeLabel: productStockLabel(product),
+    stockSource: state.orderType === "box" ? "box" : "loose",
     productId: product.id,
     productName: product.name,
     variantId: variant.id,
     variantName: variant.name,
     barcode: variant.barcode,
     price: variant.price,
-    stock: variant.stock,
+    stock: availableStock,
     imageUrl: variant.imageUrl || product.imageUrl,
     quantity: currentQuantity + addQuantity
   };
