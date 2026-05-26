@@ -860,6 +860,7 @@ select {
 .product-edit-head .product-image-wrap {
   display: grid;
   gap: 6px;
+  width: 120px;
 }
 
 .inventory-mode-switch {
@@ -894,7 +895,7 @@ select {
 }
 
 .product-edit-head .stock-type-badge {
-  top: 74px;
+  top: 82px;
 }
 
 .product-edit-head img {
@@ -902,6 +903,10 @@ select {
   border-radius: 6px;
   object-fit: cover;
   width: 96px;
+}
+
+.product-edit-head .product-image-wrap > img {
+  justify-self: start;
 }
 
 .image-uploader {
