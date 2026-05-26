@@ -32,7 +32,7 @@ function renderMallbicSyncStatus(status) {
   const success = `最後成功：${formatDateTime(status.lastSuccessAt)}`;
   const finished = status.lastFinishedAt ? `最後完成：${formatDateTime(status.lastFinishedAt)}` : "";
   const result = status.lastResult
-    ? `上次更新 ${status.lastResult.updatedCount} 筆，找不到 ${status.lastResult.unmatchedCount} 筆`
+    ? `上次更新 ${status.lastResult.updatedCount} 筆，跳過預購 ${status.lastResult.skippedPreOrderCount || 0} 筆，找不到 ${status.lastResult.unmatchedCount} 筆`
     : "";
   const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
   mallbicSyncStatusEl.textContent = [mode, success, finished, result, running, error].filter(Boolean).join("｜");

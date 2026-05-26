@@ -1335,6 +1335,7 @@ async function runMallbicInventorySync(trigger) {
         importedRows: response.importedRows,
         updatedCount: response.updatedCount,
         unmatchedCount: response.unmatchedCount,
+        skippedPreOrderCount: response.skippedPreOrderCount,
         sourceFile: response.sourceFile,
         sourceSheet: response.sourceSheet
       }
@@ -1717,20 +1718,27 @@ function applyInventoryItems(catalog, items) {
   for (const market of catalog.markets) {
     for (const product of market.products) {
       for (const variant of product.variants) {
-        barcodeMap.set(normalizeBarcode(variant.barcode), variant);
+        barcodeMap.set(normalizeBarcode(variant.barcode), { product, variant });
       }
     }
   }
 
   const updated = [];
   const unmatched = [];
+  const skippedPreOrder = [];
   for (const item of items) {
-    const variant = barcodeMap.get(normalizeBarcode(item.barcode));
-    if (!variant) {
+    const found = barcodeMap.get(normalizeBarcode(item.barcode));
+    if (!found) {
       unmatched.push(item.barcode);
       continue;
     }
 
+    if (normalizeProductStockType(found.product.stockType) === "preOrder") {
+      skippedPreOrder.push(item.barcode);
+      continue;
+    }
+
+    const { variant } = found;
     variant.stock = item.quantity;
     updated.push({ barcode: item.barcode, quantity: item.quantity });
   }
@@ -1738,8 +1746,10 @@ function applyInventoryItems(catalog, items) {
   return {
     updatedCount: updated.length,
     unmatchedCount: unmatched.length,
+    skippedPreOrderCount: skippedPreOrder.length,
     updated,
-    unmatched
+    unmatched,
+    skippedPreOrder
   };
 }
 
