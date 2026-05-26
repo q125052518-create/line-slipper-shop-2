@@ -463,6 +463,12 @@ function orderTypeLabel(value) {
   return normalizeOrderType(value) === "box" ? "整箱訂購" : "散貨訂購";
 }
 
+function effectiveOrderItemStockType(item, product) {
+  if (normalizeOrderType(item?.orderType) === "box") return "preOrder";
+  if (item?.stockType === "preOrder") return "preOrder";
+  return normalizeProductStockType(product?.stockType);
+}
+
 async function readCatalog() {
   return normalizeCatalog(await readJson(catalogFile, defaultCatalog));
 }
@@ -2789,10 +2795,11 @@ app.post("/api/orders", async (req, res) => {
     normalizedItems = items.map((item) => {
       const quantity = Number(item.quantity);
       const found = findCatalogItem(catalog, item.marketId, item.productId, item.variantId);
+      const stockType = effectiveOrderItemStockType(item, found.product);
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
       if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("數量不正確");
-      if (found.variant.stock < quantity) {
+      if (stockType !== "preOrder" && found.variant.stock < quantity) {
         throw new Error(`${found.product.name} - ${found.variant.name} 庫存不足，目前剩 ${found.variant.stock}`);
       }
 
@@ -2801,6 +2808,8 @@ app.post("/api/orders", async (req, res) => {
         marketName: found.market.name,
         orderType: normalizeOrderType(item.orderType),
         orderTypeLabel: orderTypeLabel(item.orderType),
+        stockType,
+        stockTypeLabel: stockType === "preOrder" ? "預購" : "現貨",
         productId: found.product.id,
         productName: found.product.name,
         variantId: found.variant.id,
@@ -2817,6 +2826,7 @@ app.post("/api/orders", async (req, res) => {
   }
 
   for (const item of normalizedItems) {
+    if (item.stockType === "preOrder") continue;
     const { variant } = findCatalogItem(catalog, item.marketId, item.productId, item.variantId);
     variant.stock -= item.quantity;
   }

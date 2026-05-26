@@ -96,14 +96,18 @@ function productStockType(product) {
   return product?.stockType === "preOrder" ? "preOrder" : "inStock";
 }
 
+function effectiveProductStockType(product) {
+  return state.orderType === "box" ? "preOrder" : productStockType(product);
+}
+
 function productStockLabel(product) {
-  return productStockType(product) === "preOrder" ? "預購" : "現貨";
+  return effectiveProductStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
-    const rankA = productStockType(a) === "preOrder" ? 0 : 1;
-    const rankB = productStockType(b) === "preOrder" ? 0 : 1;
+    const rankA = effectiveProductStockType(a) === "preOrder" ? 0 : 1;
+    const rankB = effectiveProductStockType(b) === "preOrder" ? 0 : 1;
     return rankA - rankB;
   });
 }
@@ -193,7 +197,7 @@ function renderProductOverview(market) {
       <button type="button" class="product-tile" data-open-product="${product.id}">
         <span class="product-image-wrap">
           <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
-          <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+          <em class="stock-type-badge is-${effectiveProductStockType(product)}">${productStockLabel(product)}</em>
         </span>
         <strong>${escapeHtml(product.name)}</strong>
       </button>
@@ -206,7 +210,8 @@ function renderProductOverview(market) {
 function renderProductDetail(market, product) {
   const selected = selectedVariant(product);
   const imageUrl = variantImage(product, selected);
-  const disabled = !selected || selected.stock <= 0;
+  const isPreOrder = effectiveProductStockType(product) === "preOrder";
+  const disabled = !selected || (!isPreOrder && selected.stock <= 0);
 
   productsEl.className = "product-detail-wrap";
   productsEl.innerHTML = `
@@ -214,10 +219,10 @@ function renderProductDetail(market, product) {
     <article class="product product-detail">
       <span class="product-image-wrap product-detail-image-wrap">
         <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
-        <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+        <em class="stock-type-badge is-${effectiveProductStockType(product)}">${productStockLabel(product)}</em>
       </span>
       <div class="product-body">
-        <h3>${escapeHtml(product.name)} <span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span></h3>
+        <h3>${escapeHtml(product.name)} <span class="stock-type-inline is-${effectiveProductStockType(product)}">${productStockLabel(product)}</span></h3>
         ${product.description ? `<p>${escapeHtml(product.description)}</p>` : ""}
         <div class="variant-card-grid" role="list" aria-label="${escapeHtml(product.name)}選項">
           ${product.variants.map((variant) => {
@@ -228,7 +233,7 @@ function renderProductDetail(market, product) {
                 class="variant-card ${isSelected ? "is-selected" : ""}"
                 data-select-variant="${product.id}"
                 data-variant-id="${variant.id}"
-                ${variant.stock <= 0 ? "data-sold-out=\"true\"" : ""}
+                ${!isPreOrder && variant.stock <= 0 ? "data-sold-out=\"true\"" : ""}
               >
                 <img src="${escapeHtml(variantImage(product, variant))}" alt="${escapeHtml(variant.name)}">
                 <span>${escapeHtml(variant.name)}</span>
@@ -263,7 +268,8 @@ function addToCart(productId) {
   const market = currentMarket();
   const product = market?.products.find((entry) => entry.id === productId);
   const variant = product ? selectedVariant(product) : null;
-  if (!market || !product || !variant || variant.stock <= 0) return;
+  const isPreOrder = effectiveProductStockType(product) === "preOrder";
+  if (!market || !product || !variant || (!isPreOrder && variant.stock <= 0)) return;
 
   const key = cartKey(market.id, product.id, variant.id);
   const quantityInput = document.querySelector(`[data-add-quantity="${product.id}"]`);
@@ -274,7 +280,7 @@ function addToCart(productId) {
     return;
   }
 
-  if (currentQuantity + addQuantity > variant.stock) {
+  if (!isPreOrder && currentQuantity + addQuantity > variant.stock) {
     showMessage(`庫存不足，目前剩 ${variant.stock}`, "error");
     return;
   }
@@ -284,6 +290,8 @@ function addToCart(productId) {
     marketName: market.name,
     orderType: state.orderType || "loose",
     orderTypeLabel: orderTypeLabel(),
+    stockType: effectiveProductStockType(product),
+    stockTypeLabel: productStockLabel(product),
     productId: product.id,
     productName: product.name,
     variantId: variant.id,

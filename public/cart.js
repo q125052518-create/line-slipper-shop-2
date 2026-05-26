@@ -89,10 +89,15 @@ function findCatalogItem(cartItem) {
   return market && product && variant ? { market, product, variant } : null;
 }
 
+function cartItemIsPreOrder(cartItem, product) {
+  return cartItem.orderType === "box" || product?.stockType === "preOrder" || cartItem.stockType === "preOrder";
+}
+
 function refreshCartFromCatalog() {
   for (const [key, cartItem] of Object.entries(state.cart)) {
     const found = findCatalogItem(cartItem);
-    if (!found || found.variant.stock <= 0) {
+    const isPreOrder = found && cartItemIsPreOrder(cartItem, found.product);
+    if (!found || (!isPreOrder && found.variant.stock <= 0)) {
       delete state.cart[key];
       continue;
     }
@@ -102,13 +107,15 @@ function refreshCartFromCatalog() {
       marketName: found.market.name,
       orderType: cartItem.orderType === "box" ? "box" : "loose",
       orderTypeLabel: cartItem.orderType === "box" ? "整箱訂購" : "散貨訂購",
+      stockType: isPreOrder ? "preOrder" : "inStock",
+      stockTypeLabel: isPreOrder ? "預購" : "現貨",
       productName: found.product.name,
       variantName: found.variant.name,
       barcode: found.variant.barcode,
       price: found.variant.price,
       stock: found.variant.stock,
       imageUrl: found.variant.imageUrl || found.product.imageUrl,
-      quantity: Math.min(cartItem.quantity, found.variant.stock)
+      quantity: isPreOrder ? cartItem.quantity : Math.min(cartItem.quantity, found.variant.stock)
     };
   }
   saveCart();
@@ -133,6 +140,7 @@ function renderCart() {
       <div>
         <strong>${escapeHtml(item.productName)}</strong>
         <span>${escapeHtml(item.orderTypeLabel || (item.orderType === "box" ? "整箱訂購" : "散貨訂購"))}</span>
+        <span>${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))}</span>
         <span>${escapeHtml(item.variantName)} / ${escapeHtml(item.barcode)}</span>
         <span>${escapeHtml(item.marketName)}</span>
         <span>${formatMoney(item.price)} / 雙，庫存 ${item.stock}</span>
@@ -140,7 +148,7 @@ function renderCart() {
       <div class="quantity">
         <button type="button" data-minus="${key}">-</button>
         <span>${item.quantity}</span>
-        <button type="button" data-plus="${key}" ${item.quantity >= item.stock ? "disabled" : ""}>+</button>
+        <button type="button" data-plus="${key}" ${item.stockType !== "preOrder" && item.quantity >= item.stock ? "disabled" : ""}>+</button>
       </div>
       <button type="button" data-remove="${key}">移除</button>
     </div>
@@ -161,7 +169,7 @@ function changeQuantity(key, delta) {
   const next = item.quantity + delta;
   if (next <= 0) {
     delete state.cart[key];
-  } else if (next <= item.stock) {
+  } else if (item.stockType === "preOrder" || next <= item.stock) {
     item.quantity = next;
   } else {
     messageEl.textContent = `庫存不足，目前剩 ${item.stock}`;
@@ -201,6 +209,7 @@ formEl.addEventListener("submit", async (event) => {
   const items = Object.values(state.cart).map((item) => ({
     marketId: item.marketId,
     orderType: item.orderType === "box" ? "box" : "loose",
+    stockType: item.stockType === "preOrder" ? "preOrder" : "inStock",
     productId: item.productId,
     variantId: item.variantId,
     quantity: item.quantity
