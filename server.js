@@ -1507,22 +1507,45 @@ async function runMallbicOrderSync(trigger) {
           }
           return { ...result, orderNumbers };
         });
+        const verifiedOrderNumbers = mallbicResult.orderNumbers || {};
+        const verifiedOrderCount = importOrders.filter((order) => verifiedOrderNumbers[order.id]).length;
+        if (mallbicResult.importedCount !== null && mallbicResult.importedCount <= 0) {
+          throw new Error("Mallbic import returned 0 imported rows");
+        }
+        if (verifiedOrderCount === 0) {
+          throw new Error("Mallbic import could not be verified because no Mallbic order number was found");
+        }
         const importedAt = new Date().toISOString();
+        let importedOrderCount = 0;
+        let importedRowCount = 0;
         for (const order of importOrders) {
-          order.mallbic.importStatus = "imported";
-          order.mallbic.importedAt = importedAt;
-          order.mallbic.importError = "";
-          order.mallbic.importFileName = workbook.filename;
-          order.mallbic.importRowCount = expandMallbicOrderRows(order).length;
-          order.mallbic.mallbicOrderNo = mallbicResult.orderNumbers?.[order.id] || "";
+          const mallbicOrderNo = verifiedOrderNumbers[order.id] || "";
+          if (mallbicOrderNo) {
+            const rowCount = expandMallbicOrderRows(order).length;
+            importedOrderCount += 1;
+            importedRowCount += rowCount;
+            order.mallbic.importStatus = "imported";
+            order.mallbic.importedAt = importedAt;
+            order.mallbic.importError = "";
+            order.mallbic.importFileName = workbook.filename;
+            order.mallbic.importRowCount = rowCount;
+            order.mallbic.mallbicOrderNo = mallbicOrderNo;
+          } else {
+            order.mallbic.importStatus = "importFailed";
+            order.mallbic.importError = "Mallbic order number was not found after import";
+            order.mallbic.importFileName = workbook.filename;
+            order.mallbic.importRowCount = expandMallbicOrderRows(order).length;
+            order.mallbic.mallbicOrderNo = "";
+            errors.push(`${order.id} import was not verified in Mallbic`);
+          }
         }
         importResult = {
-          importedOrders: importOrders.length,
-          importedRows: workbook.rowCount,
+          importedOrders: importedOrderCount,
+          importedRows: importedRowCount,
           sourceFile: workbook.filename,
           mallbicMessage: mallbicResult.message,
           mallbicImportedCount: mallbicResult.importedCount,
-          mallbicOrderNumbers: mallbicResult.orderNumbers || {},
+          mallbicOrderNumbers: verifiedOrderNumbers,
           lookupErrors
         };
       } catch (error) {
