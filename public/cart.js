@@ -100,6 +100,8 @@ function refreshCartFromCatalog() {
     state.cart[key] = {
       ...cartItem,
       marketName: found.market.name,
+      orderType: cartItem.orderType === "box" ? "box" : "loose",
+      orderTypeLabel: cartItem.orderType === "box" ? "整箱訂購" : "散貨訂購",
       productName: found.product.name,
       variantName: found.variant.name,
       barcode: found.variant.barcode,
@@ -130,6 +132,7 @@ function renderCart() {
       <img class="cart-thumb" src="${escapeHtml(item.imageUrl || placeholderImage(item.productName))}" alt="${escapeHtml(item.variantName)}">
       <div>
         <strong>${escapeHtml(item.productName)}</strong>
+        <span>${escapeHtml(item.orderTypeLabel || (item.orderType === "box" ? "整箱訂購" : "散貨訂購"))}</span>
         <span>${escapeHtml(item.variantName)} / ${escapeHtml(item.barcode)}</span>
         <span>${escapeHtml(item.marketName)}</span>
         <span>${formatMoney(item.price)} / 雙，庫存 ${item.stock}</span>
@@ -197,6 +200,7 @@ formEl.addEventListener("submit", async (event) => {
 
   const items = Object.values(state.cart).map((item) => ({
     marketId: item.marketId,
+    orderType: item.orderType === "box" ? "box" : "loose",
     productId: item.productId,
     variantId: item.variantId,
     quantity: item.quantity

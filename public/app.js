@@ -4,6 +4,7 @@ const state = {
   markets: [],
   currentMarketId: "",
   currentProductId: "",
+  orderType: "",
   selectedVariants: {},
   cart: readCart(),
   buyer: null
@@ -99,6 +100,10 @@ function productStockLabel(product) {
   return productStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
+function orderTypeLabel(orderType = state.orderType) {
+  return orderType === "box" ? "整箱訂購" : "散貨訂購";
+}
+
 function showMessage(text, type = "success") {
   clearTimeout(messageTimer);
   messageEl.textContent = text;
@@ -124,10 +129,17 @@ function selectedVariant(product) {
 
 function renderProducts() {
   const market = currentMarket();
-  marketDescriptionEl.textContent = market?.description || "";
+  marketDescriptionEl.textContent = state.orderType
+    ? `${orderTypeLabel()}${market?.description ? `｜${market.description}` : ""}`
+    : "";
 
   if (!market) {
     productsEl.innerHTML = '<p class="empty">目前沒有商品資料</p>';
+    return;
+  }
+
+  if (!state.orderType) {
+    renderOrderTypeMenu();
     return;
   }
 
@@ -145,9 +157,26 @@ function renderProducts() {
   renderProductOverview(market);
 }
 
+function renderOrderTypeMenu() {
+  productsEl.className = "order-type-menu";
+  productsEl.innerHTML = `
+    <button type="button" class="order-type-card" data-order-type="box">
+      <strong>整箱訂購</strong>
+      <span>進入商品列表</span>
+    </button>
+    <button type="button" class="order-type-card" data-order-type="loose">
+      <strong>散貨訂購</strong>
+      <span>進入商品列表</span>
+    </button>
+  `;
+}
+
 function renderProductOverview(market) {
-  productsEl.className = "product-overview-grid";
-  productsEl.innerHTML = market.products.map((product) => {
+  productsEl.className = "product-overview-wrap";
+  productsEl.innerHTML = `
+    <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
+    <div class="product-overview-grid">
+      ${market.products.map((product) => {
     const variant = firstVariant(product);
     const imageUrl = variantImage(product, variant);
 
@@ -160,7 +189,9 @@ function renderProductOverview(market) {
         <strong>${escapeHtml(product.name)}</strong>
       </button>
     `;
-  }).join("");
+  }).join("")}
+    </div>
+  `;
 }
 
 function renderProductDetail(market, product) {
@@ -213,8 +244,8 @@ function renderProductDetail(market, product) {
   `;
 }
 
-function cartKey(marketId, productId, variantId) {
-  return `${marketId}|${productId}|${variantId}`;
+function cartKey(marketId, productId, variantId, orderType = state.orderType) {
+  return `${orderType || "loose"}|${marketId}|${productId}|${variantId}`;
 }
 
 function addToCart(productId) {
@@ -242,6 +273,8 @@ function addToCart(productId) {
   state.cart[key] = {
     marketId: market.id,
     marketName: market.name,
+    orderType: state.orderType || "loose",
+    orderTypeLabel: orderTypeLabel(),
     productId: product.id,
     productName: product.name,
     variantId: variant.id,
@@ -265,6 +298,25 @@ marketSelectEl?.addEventListener("change", () => {
 });
 
 document.addEventListener("click", (event) => {
+  const orderTypeButton = event.target.closest("[data-order-type]");
+  if (orderTypeButton) {
+    state.orderType = orderTypeButton.dataset.orderType;
+    state.currentProductId = "";
+    state.selectedVariants = {};
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  if (event.target.closest("[data-back-to-order-types]")) {
+    state.orderType = "";
+    state.currentProductId = "";
+    state.selectedVariants = {};
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
   const openProductButton = event.target.closest("[data-open-product]");
   if (openProductButton) {
     const productId = openProductButton.dataset.openProduct;

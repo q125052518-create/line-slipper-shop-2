@@ -455,6 +455,14 @@ function normalizeProductStockType(value) {
   return value === "preOrder" ? "preOrder" : "inStock";
 }
 
+function normalizeOrderType(value) {
+  return value === "box" ? "box" : "loose";
+}
+
+function orderTypeLabel(value) {
+  return normalizeOrderType(value) === "box" ? "整箱訂購" : "散貨訂購";
+}
+
 async function readCatalog() {
   return normalizeCatalog(await readJson(catalogFile, defaultCatalog));
 }
@@ -853,7 +861,7 @@ function findCatalogItemAnyStatus(catalog, marketId, productId, variantId) {
 
 function buildOrderSummary(order) {
   const lines = order.items
-    .map((item) => `${item.productName} - ${item.variantName} x ${item.quantity}`)
+    .map((item) => `${item.orderTypeLabel || orderTypeLabel(item.orderType)} / ${item.productName} - ${item.variantName} x ${item.quantity}`)
     .join("\n");
   return `訂單已建立：${order.id}\n${lines}\n總金額：NT$${order.totalAmount}`;
 }
@@ -2791,6 +2799,8 @@ app.post("/api/orders", async (req, res) => {
       return {
         marketId: found.market.id,
         marketName: found.market.name,
+        orderType: normalizeOrderType(item.orderType),
+        orderTypeLabel: orderTypeLabel(item.orderType),
         productId: found.product.id,
         productName: found.product.name,
         variantId: found.variant.id,

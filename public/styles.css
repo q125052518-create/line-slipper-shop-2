@@ -262,6 +262,45 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
 }
 
+.product-overview-wrap {
+  display: grid;
+  gap: 14px;
+}
+
+.order-type-menu {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-type-card {
+  align-content: center;
+  background: #ffffff;
+  border: 1px solid #d5cec2;
+  border-radius: 8px;
+  color: #18201b;
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+  padding: 24px;
+  text-align: center;
+}
+
+.order-type-card:hover {
+  background: #fffaf4;
+  border-color: #116c5b;
+  box-shadow: 0 0 0 2px rgba(17, 108, 91, 0.12);
+}
+
+.order-type-card strong {
+  font-size: 28px;
+}
+
+.order-type-card span {
+  color: #65716b;
+  font-size: 15px;
+}
+
 .product-tile {
   background: #ffffff;
   border: 1px solid #d5cec2;
@@ -1275,6 +1314,14 @@ button.admin-chat-list-item.is-selected {
 
   .product-overview-grid {
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  }
+
+  .order-type-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .order-type-card {
+    min-height: 132px;
   }
 
   .product-detail {
