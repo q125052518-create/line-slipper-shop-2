@@ -100,6 +100,14 @@ function productStockLabel(product) {
   return productStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
+function sortProductsForDisplay(products) {
+  return [...products].sort((a, b) => {
+    const rankA = productStockType(a) === "preOrder" ? 0 : 1;
+    const rankB = productStockType(b) === "preOrder" ? 0 : 1;
+    return rankA - rankB;
+  });
+}
+
 function orderTypeLabel(orderType = state.orderType) {
   return orderType === "box" ? "整箱訂購" : "散貨訂購";
 }
@@ -172,11 +180,12 @@ function renderOrderTypeMenu() {
 }
 
 function renderProductOverview(market) {
+  const products = sortProductsForDisplay(market.products);
   productsEl.className = "product-overview-wrap";
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
     <div class="product-overview-grid">
-      ${market.products.map((product) => {
+      ${products.map((product) => {
     const variant = firstVariant(product);
     const imageUrl = variantImage(product, variant);
 

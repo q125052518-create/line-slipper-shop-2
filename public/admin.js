@@ -127,6 +127,14 @@ function productStockLabel(product) {
   return productStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
+function sortProductsForDisplay(products) {
+  return [...products].sort((a, b) => {
+    const rankA = productStockType(a) === "preOrder" ? 0 : 1;
+    const rankB = productStockType(b) === "preOrder" ? 0 : 1;
+    return rankA - rankB;
+  });
+}
+
 function productStockTypeField(value = "inStock") {
   const cleanValue = value === "preOrder" ? "preOrder" : "inStock";
   return `
@@ -160,12 +168,12 @@ function productSearchText(product) {
 
 function filteredProducts(market) {
   const query = normalizeSearchText(productSearchQuery);
-  if (!query) return market.products;
-  const keywords = query.split(/\s+/).filter(Boolean);
-  return market.products.filter((product) => {
+  const products = query ? market.products.filter((product) => {
     const haystack = productSearchText(product);
+    const keywords = query.split(/\s+/).filter(Boolean);
     return keywords.every((keyword) => haystack.includes(keyword));
-  });
+  }) : market.products;
+  return sortProductsForDisplay(products);
 }
 
 function updateProductSearchCount(visibleCount, totalCount) {
