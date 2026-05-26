@@ -310,6 +310,7 @@ function renderProductEditor(market, product) {
               <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
               <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
             </span>
+            ${productBoxEnabledField(product.boxEnabled)}
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
             <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
           </span>
@@ -323,7 +324,6 @@ function renderProductEditor(market, product) {
           <input name="name" value="${escapeHtml(product.name)}" required>
         </label>
         ${productStockTypeField(product.stockType)}
-        ${productBoxEnabledField(product.boxEnabled)}
         <label>
           商品說明
           <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>

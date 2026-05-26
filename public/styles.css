@@ -836,6 +836,18 @@ select {
   gap: 8px;
 }
 
+.product-image-wrap > .toggle-field {
+  background: #fffaf4;
+  border: 1px solid #d5cec2;
+  border-radius: 6px;
+  color: #18201b;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  padding: 6px;
+  width: 96px;
+}
+
 .toggle-field input {
   height: 18px;
   width: 18px;
@@ -876,7 +888,7 @@ select {
 }
 
 .product-edit-head .stock-type-badge {
-  top: 40px;
+  top: 74px;
 }
 
 .product-edit-head img {
