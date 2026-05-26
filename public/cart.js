@@ -66,7 +66,7 @@ function saveCart() {
 
 function clearCart() {
   state.cart = {};
-  saveCart();
+  localStorage.removeItem(CART_KEY);
 }
 
 function formatMoney(value) {

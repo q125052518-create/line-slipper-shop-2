@@ -47,6 +47,11 @@ function saveCart() {
   renderCartCount();
 }
 
+function reloadCart() {
+  state.cart = readCart();
+  renderCartCount();
+}
+
 function renderCartCount() {
   const count = Object.values(state.cart).reduce((sum, item) => sum + item.quantity, 0);
   cartCountEl.textContent = count;
@@ -199,6 +204,8 @@ function cartKey(marketId, productId, variantId) {
 }
 
 function addToCart(productId) {
+  reloadCart();
+
   const market = currentMarket();
   const product = market?.products.find((entry) => entry.id === productId);
   const variant = product ? selectedVariant(product) : null;
@@ -273,5 +280,8 @@ document.addEventListener("click", (event) => {
   const productId = event.target.dataset.addProduct;
   if (productId) addToCart(productId);
 });
+
+window.addEventListener("pageshow", reloadCart);
+window.addEventListener("focus", reloadCart);
 
 loadBuyerStatus().finally(loadMarkets);
