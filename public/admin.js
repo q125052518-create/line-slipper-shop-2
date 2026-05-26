@@ -119,6 +119,27 @@ function productTileImage(product) {
   return variant?.imageUrl || product?.imageUrl || "https://placehold.co/300x300/f2efe8/1e2720?text=Slipper";
 }
 
+function productStockType(product) {
+  return product?.stockType === "preOrder" ? "preOrder" : "inStock";
+}
+
+function productStockLabel(product) {
+  return productStockType(product) === "preOrder" ? "預購" : "現貨";
+}
+
+function productStockTypeField(value = "inStock") {
+  const cleanValue = value === "preOrder" ? "preOrder" : "inStock";
+  return `
+    <label>
+      販售狀態
+      <select name="stockType" required>
+        <option value="inStock" ${cleanValue === "inStock" ? "selected" : ""}>現貨</option>
+        <option value="preOrder" ${cleanValue === "preOrder" ? "selected" : ""}>預購</option>
+      </select>
+    </label>
+  `;
+}
+
 function normalizeSearchText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -127,6 +148,7 @@ function productSearchText(product) {
   return [
     product.id,
     product.name,
+    productStockLabel(product),
     product.barcode,
     ...(product.variants || []).flatMap((variant) => [
       variant.id,
@@ -205,7 +227,10 @@ function renderProductOverview(market) {
       <div class="product-overview-grid admin-product-overview">
         ${products.map((product) => `
           <button type="button" class="product-tile admin-product-tile" data-open-admin-product="${product.id}">
-            <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
+            <span class="product-image-wrap">
+              <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
+              <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+            </span>
             <strong>${escapeHtml(product.name)}</strong>
           </button>
         `).join("") || '<p class="empty">找不到符合條件的商品</p>'}
@@ -220,7 +245,7 @@ function renderNewProductEditor(market) {
   catalogEditorEl.innerHTML = `
     <article class="market-editor admin-product-detail" data-market-id="${market.id}">
       <div class="admin-product-detail-head">
-        <button type="button" class="back-button" data-back-to-admin-products>回商品列表</button>
+        <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
       </div>
       <form id="productForm" class="product-edit-form new-product-form" data-create-product>
         <input type="hidden" name="marketId" value="${escapeHtml(market.id)}">
@@ -229,6 +254,7 @@ function renderNewProductEditor(market) {
           商品名稱
           <input name="name" placeholder="例如 雲朵厚底拖鞋" required>
         </label>
+        ${productStockTypeField()}
         <label>
           商品說明
           <textarea name="description" rows="3"></textarea>
@@ -249,21 +275,25 @@ function renderProductEditor(market, product) {
   catalogEditorEl.innerHTML = `
     <article class="market-editor admin-product-detail" data-market-id="${market.id}">
       <div class="admin-product-detail-head">
-        <button type="button" class="back-button" data-back-to-admin-products>回商品列表</button>
+        <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
         <button type="button" data-delete-product="${product.id}">刪除商品</button>
       </div>
       <form class="product-edit-form" data-product-id="${product.id}">
         <div class="product-edit-head">
-          <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
+          <span class="product-image-wrap">
+            <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
+            <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+          </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
-            <p>${escapeHtml(product.description || "")}</p>
+            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${escapeHtml(product.description || "")}</p>
           </div>
         </div>
         <label>
           商品名稱
           <input name="name" value="${escapeHtml(product.name)}" required>
         </label>
+        ${productStockTypeField(product.stockType)}
         <label>
           商品說明
           <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>
@@ -271,7 +301,7 @@ function renderProductEditor(market, product) {
         <div class="variant-editor">
           ${product.variants.map((variant) => variantRow(variant)).join("")}
         </div>
-        <button type="button" data-add-variant>新增選項</button>
+        <button type="button" data-add-variant>新增品項</button>
         <button type="submit">儲存商品</button>
       </form>
     </article>
@@ -429,6 +459,7 @@ document.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         name: formData.get("name"),
         imageUrl,
+        stockType: formData.get("stockType"),
         description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
@@ -478,6 +509,7 @@ document.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         name: formData.get("name"),
         imageUrl,
+        stockType: formData.get("stockType"),
         description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })

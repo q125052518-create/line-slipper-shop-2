@@ -439,6 +439,7 @@ function normalizeCatalog(catalog) {
     market.imageUrl = String(market.imageUrl || "").trim();
     market.products = Array.isArray(market.products) ? market.products : [];
     for (const product of market.products) {
+      product.stockType = normalizeProductStockType(product.stockType);
       product.variants = Array.isArray(product.variants) ? product.variants : [];
       for (const variant of product.variants) {
         const stock = Number(variant.stock);
@@ -448,6 +449,10 @@ function normalizeCatalog(catalog) {
     }
   }
   return catalog;
+}
+
+function normalizeProductStockType(value) {
+  return value === "preOrder" ? "preOrder" : "inStock";
 }
 
 async function readCatalog() {
@@ -816,6 +821,7 @@ function normalizeProduct(input, existingId) {
   const name = String(input.name || "").trim();
   const imageUrl = String(input.imageUrl || "").trim();
   const description = String(input.description || "").trim();
+  const stockType = normalizeProductStockType(input.stockType);
   const variants = Array.isArray(input.variants) ? input.variants : [];
 
   if (!name) throw new Error("請填寫商品名稱");
@@ -826,6 +832,7 @@ function normalizeProduct(input, existingId) {
     name,
     imageUrl,
     description,
+    stockType,
     variants: variants.map((variant) => normalizeVariant(variant, variant.id))
   };
 }
@@ -1781,6 +1788,7 @@ app.post("/api/admin/products/import", async (req, res) => {
         name: item.productName,
         imageUrl: item.productImageUrl,
         description: item.productDescription,
+        stockType: "inStock",
         variants: []
       };
       market.products.push(product);

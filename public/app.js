@@ -91,6 +91,14 @@ function firstVariant(product) {
   return product?.variants?.[0] || null;
 }
 
+function productStockType(product) {
+  return product?.stockType === "preOrder" ? "preOrder" : "inStock";
+}
+
+function productStockLabel(product) {
+  return productStockType(product) === "preOrder" ? "預購" : "現貨";
+}
+
 function showMessage(text, type = "success") {
   clearTimeout(messageTimer);
   messageEl.textContent = text;
@@ -145,7 +153,10 @@ function renderProductOverview(market) {
 
     return `
       <button type="button" class="product-tile" data-open-product="${product.id}">
-        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
+        <span class="product-image-wrap">
+          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
+          <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+        </span>
         <strong>${escapeHtml(product.name)}</strong>
       </button>
     `;
@@ -161,9 +172,12 @@ function renderProductDetail(market, product) {
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-products>回商品列表</button>
     <article class="product product-detail">
-      <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
+      <span class="product-image-wrap product-detail-image-wrap">
+        <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
+        <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+      </span>
       <div class="product-body">
-        <h3>${escapeHtml(product.name)}</h3>
+        <h3>${escapeHtml(product.name)} <span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span></h3>
         ${product.description ? `<p>${escapeHtml(product.description)}</p>` : ""}
         <div class="variant-card-grid" role="list" aria-label="${escapeHtml(product.name)}選項">
           ${product.variants.map((variant) => {
