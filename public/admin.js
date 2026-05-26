@@ -314,7 +314,6 @@ function renderProductEditor(market, product) {
               ${productBoxEnabledField(product.boxEnabled)}
             </span>
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
-            <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
           </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
