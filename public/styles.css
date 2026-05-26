@@ -845,7 +845,7 @@ select {
   font-weight: 700;
   justify-content: center;
   padding: 6px;
-  width: 96px;
+  width: 110px;
 }
 
 .toggle-field input {
@@ -871,6 +871,12 @@ select {
   grid-template-columns: repeat(2, 1fr);
   padding: 2px;
   width: 96px;
+}
+
+.inventory-top-controls {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .inventory-mode-switch button {

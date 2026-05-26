@@ -156,7 +156,7 @@ function productStockTypeField(value = "inStock") {
 
 function productBoxEnabledField(checked = false) {
   return `
-    <label class="toggle-field">
+    <label class="toggle-field box-enabled-toggle">
       <input type="checkbox" name="boxEnabled" ${checked ? "checked" : ""}>
       <span>整箱上架</span>
     </label>
@@ -306,11 +306,13 @@ function renderProductEditor(market, product) {
       <form class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
         <div class="product-edit-head">
           <span class="product-image-wrap">
-            <span class="inventory-mode-switch" aria-label="庫存模式">
-              <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
-              <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
+            <span class="inventory-top-controls">
+              <span class="inventory-mode-switch" aria-label="庫存模式">
+                <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
+                <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
+              </span>
+              ${productBoxEnabledField(product.boxEnabled)}
             </span>
-            ${productBoxEnabledField(product.boxEnabled)}
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
             <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
           </span>
