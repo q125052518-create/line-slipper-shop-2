@@ -154,6 +154,15 @@ function productStockTypeField(value = "inStock") {
   `;
 }
 
+function productBoxEnabledField(checked = false) {
+  return `
+    <label class="toggle-field">
+      <input type="checkbox" name="boxEnabled" ${checked ? "checked" : ""}>
+      <span>整箱上架</span>
+    </label>
+  `;
+}
+
 function normalizeSearchText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -163,6 +172,7 @@ function productSearchText(product) {
     product.id,
     product.name,
     productStockLabel(product),
+    product.boxEnabled ? "整箱上架" : "",
     product.barcode,
     ...(product.variants || []).flatMap((variant) => [
       variant.id,
@@ -269,6 +279,7 @@ function renderNewProductEditor(market) {
           <input name="name" placeholder="例如 雲朵厚底拖鞋" required>
         </label>
         ${productStockTypeField()}
+        ${productBoxEnabledField(false)}
         <label>
           商品說明
           <textarea name="description" rows="3"></textarea>
@@ -304,7 +315,7 @@ function renderProductEditor(market, product) {
           </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
-            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${escapeHtml(product.description || "")}</p>
+            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""} ${escapeHtml(product.description || "")}</p>
           </div>
         </div>
         <label>
@@ -312,6 +323,7 @@ function renderProductEditor(market, product) {
           <input name="name" value="${escapeHtml(product.name)}" required>
         </label>
         ${productStockTypeField(product.stockType)}
+        ${productBoxEnabledField(product.boxEnabled)}
         <label>
           商品說明
           <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>
@@ -490,6 +502,7 @@ document.addEventListener("submit", async (event) => {
         name: formData.get("name"),
         imageUrl,
         stockType: formData.get("stockType"),
+        boxEnabled: formData.get("boxEnabled") === "on",
         description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
@@ -540,6 +553,7 @@ document.addEventListener("submit", async (event) => {
         name: formData.get("name"),
         imageUrl,
         stockType: formData.get("stockType"),
+        boxEnabled: formData.get("boxEnabled") === "on",
         description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })

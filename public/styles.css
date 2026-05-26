@@ -373,6 +373,17 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   color: #ffffff;
 }
 
+.box-enabled-inline {
+  background: #295f98;
+  border-radius: 4px;
+  color: #ffffff;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 5px 7px;
+}
+
 .product-tile strong {
   display: -webkit-box;
   font-size: 15px;
@@ -816,6 +827,18 @@ select {
 .product-edit-form {
   border-top: 1px solid #e5dfd5;
   padding-top: 16px;
+}
+
+.toggle-field {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.toggle-field input {
+  height: 18px;
+  width: 18px;
 }
 
 .product-edit-head {

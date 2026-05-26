@@ -102,7 +102,7 @@ function refreshCartFromCatalog() {
     const found = findCatalogItem(cartItem);
     const isPreOrder = found && cartItemIsPreOrder(cartItem, found.product);
     const availableStock = found ? cartItemAvailableStock(cartItem, found.variant) : 0;
-    if (!found || availableStock <= 0) {
+    if (!found || (cartItem.orderType === "box" && found.product.boxEnabled !== true) || availableStock <= 0) {
       delete state.cart[key];
       continue;
     }

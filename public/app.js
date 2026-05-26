@@ -188,7 +188,10 @@ function renderOrderTypeMenu() {
 }
 
 function renderProductOverview(market) {
-  const products = sortProductsForDisplay(market.products);
+  const visibleProducts = state.orderType === "box"
+    ? market.products.filter((product) => product.boxEnabled === true)
+    : market.products;
+  const products = sortProductsForDisplay(visibleProducts);
   productsEl.className = "product-overview-wrap";
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
@@ -206,7 +209,7 @@ function renderProductOverview(market) {
         <strong>${escapeHtml(product.name)}</strong>
       </button>
     `;
-  }).join("")}
+  }).join("") || '<p class="empty">目前沒有可訂購商品</p>'}
     </div>
   `;
 }
@@ -275,6 +278,7 @@ function addToCart(productId) {
   const variant = product ? selectedVariant(product) : null;
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
   const availableStock = variantDisplayStock(variant);
+  if (state.orderType === "box" && product?.boxEnabled !== true) return;
   if (!market || !product || !variant || availableStock <= 0) return;
 
   const key = cartKey(market.id, product.id, variant.id);

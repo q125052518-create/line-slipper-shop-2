@@ -440,12 +440,12 @@ function normalizeCatalog(catalog) {
     market.products = Array.isArray(market.products) ? market.products : [];
     for (const product of market.products) {
       product.stockType = normalizeProductStockType(product.stockType);
+      product.boxEnabled = product.boxEnabled === true;
       product.variants = Array.isArray(product.variants) ? product.variants : [];
       for (const variant of product.variants) {
         const stock = Number(variant.stock);
         const boxStock = Number(variant.boxStock);
         variant.stock = Number.isInteger(stock) && stock >= 0 ? stock : 0;
-  if (!Number.isInteger(boxStock) || boxStock < 0) throw new Error("?????????");
         variant.boxStock = Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0;
         variant.imageUrl = String(variant.imageUrl || "").trim();
       }
@@ -840,6 +840,7 @@ function normalizeVariant(input, existingId) {
   if (!barcode) throw new Error("請填寫品項條碼");
   if (!Number.isFinite(price) || price < 0) throw new Error("請填寫正確價格");
   if (!Number.isInteger(stock) || stock < 0) throw new Error("請填寫正確庫存");
+  if (!Number.isInteger(boxStock) || boxStock < 0) throw new Error("Invalid box stock");
 
   return {
     id: existingId || input.id || makeId("variant"),
@@ -857,6 +858,7 @@ function normalizeProduct(input, existingId) {
   const imageUrl = String(input.imageUrl || "").trim();
   const description = String(input.description || "").trim();
   const stockType = normalizeProductStockType(input.stockType);
+  const boxEnabled = input.boxEnabled === true;
   const variants = Array.isArray(input.variants) ? input.variants : [];
 
   if (!name) throw new Error("請填寫商品名稱");
@@ -868,6 +870,7 @@ function normalizeProduct(input, existingId) {
     imageUrl,
     description,
     stockType,
+    boxEnabled,
     variants: variants.map((variant) => normalizeVariant(variant, variant.id))
   };
 }
@@ -1835,6 +1838,7 @@ app.post("/api/admin/products/import", async (req, res) => {
         imageUrl: item.productImageUrl,
         description: item.productDescription,
         stockType: "inStock",
+        boxEnabled: false,
         variants: []
       };
       market.products.push(product);
@@ -2824,6 +2828,7 @@ app.post("/api/orders", async (req, res) => {
       const availableStock = found.variant ? orderItemAvailableStock(item, found.variant) : 0;
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
+      if (usesBoxStock && found.product.boxEnabled !== true) throw new Error("Box ordering is not enabled for this product");
       if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("數量不正確");
       if ((usesBoxStock || stockType !== "preOrder") && availableStock < quantity) {
         throw new Error(`${found.product.name} - ${found.variant.name} 庫存不足，目前剩 ${availableStock}`);
