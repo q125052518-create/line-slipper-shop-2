@@ -306,9 +306,12 @@ function renderProductEditor(market, product) {
     <article class="market-editor admin-product-detail" data-market-id="${market.id}">
       <div class="admin-product-detail-head">
         <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
-        <button type="button" data-delete-product="${product.id}">刪除商品</button>
+        <div class="admin-product-detail-actions">
+          <button type="submit" form="productEditForm">????</button>
+          <button type="button" data-delete-product="${product.id}">????</button>
+        </div>
       </div>
-      <form class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
+      <form id="productEditForm" class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
         <div class="product-edit-head">
           <span class="product-image-wrap">
             <span class="inventory-top-controls">
@@ -338,7 +341,6 @@ function renderProductEditor(market, product) {
           ${product.variants.map((variant) => variantRow(variant)).join("")}
         </div>
         <button type="button" data-add-variant>新增品項</button>
-        <button type="submit">儲存商品</button>
       </form>
     </article>
   `;

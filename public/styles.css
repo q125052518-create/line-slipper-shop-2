@@ -404,9 +404,21 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
 
 .admin-product-detail-head {
   align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #e5dfd5;
   display: flex;
   gap: 10px;
   justify-content: space-between;
+  padding: 10px 0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.admin-product-detail-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
 }
 
 .admin-list-actions {
