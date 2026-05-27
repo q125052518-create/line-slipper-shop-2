@@ -307,8 +307,8 @@ function renderProductEditor(market, product) {
       <div class="admin-product-detail-head">
         <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
         <div class="admin-product-detail-actions">
-          <button type="submit" form="productEditForm">????</button>
-          <button type="button" data-delete-product="${product.id}">????</button>
+          <button type="submit" form="productEditForm">儲存商品</button>
+          <button type="button" data-delete-product="${product.id}">刪除商品</button>
         </div>
       </div>
       <form id="productEditForm" class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
