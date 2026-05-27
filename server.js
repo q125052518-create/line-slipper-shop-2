@@ -264,6 +264,14 @@ app.post("/api/admin/chats/:buyerId/messages", requireAdminApi, async (req, res)
 
 app.use(["/admin.html", "/admin-chat.html", "/admin-tools.html", "/admin-orders.html", "/admin-stats.html"], requireAdminPage);
 app.use("/api/admin", requireAdminApi);
+
+app.get("/product-import-template.xlsx", (_req, res) => {
+  const buffer = createProductImportTemplateBuffer();
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", 'attachment; filename="product-import-template.xlsx"');
+  res.send(buffer);
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 async function ensureStore() {
@@ -1848,7 +1856,7 @@ app.post("/api/admin/products/import", async (req, res) => {
         imageUrl: item.productImageUrl,
         description: item.productDescription,
         stockType: "inStock",
-        boxEnabled: false,
+        boxEnabled: item.boxEnabled,
         variants: []
       };
       market.products.push(product);
@@ -1856,15 +1864,16 @@ app.post("/api/admin/products/import", async (req, res) => {
     } else {
       product.description = item.productDescription || product.description || "";
       product.imageUrl = item.productImageUrl || product.imageUrl || "";
+      product.boxEnabled = product.boxEnabled || item.boxEnabled;
     }
 
     const variant = product.variants.find((entry) => entry.barcode.trim().toUpperCase() === item.barcode.toUpperCase());
     if (variant) {
       variant.name = item.variantName;
       variant.price = item.price;
-      variant.boxPrice = Number(variant.boxPrice || item.price);
+      variant.boxPrice = item.boxPrice;
       variant.stock = item.stock;
-      variant.boxStock = Number(variant.boxStock || 0);
+      variant.boxStock = item.boxStock;
       variant.imageUrl = item.variantImageUrl || variant.imageUrl || "";
       updatedVariants += 1;
     } else {
@@ -1874,9 +1883,9 @@ app.post("/api/admin/products/import", async (req, res) => {
         barcode: item.barcode,
         imageUrl: item.variantImageUrl,
         price: item.price,
-        boxPrice: item.price,
+        boxPrice: item.boxPrice,
         stock: item.stock,
-        boxStock: 0
+        boxStock: item.boxStock
       });
       createdVariants += 1;
     }
@@ -2641,7 +2650,7 @@ async function exportMallbicInventoryWorkbook({ account, password }) {
   }
 }
 
-function parseProductImportRows(rows) {
+function parseProductImportRowsLegacy(rows) {
   const requiredHeaders = ["賣場名稱", "商品名稱", "款式", "品項條碼", "售價", "數量"];
   const headerIndex = rows.findIndex((row) => {
     const cells = row.map((cell) => String(cell).trim());
@@ -2699,10 +2708,138 @@ function parseProductImportRows(rows) {
   return { items };
 }
 
-function parseActiveValue(value) {
+function parseActiveValueLegacy(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text) return true;
   return ["是", "上架", "true", "1", "yes", "y"].includes(text);
+}
+
+function parseProductImportRows(rows) {
+  const requiredHeaders = [
+    "\u8ce3\u5834\u540d\u7a31",
+    "\u5546\u54c1\u540d\u7a31",
+    "\u6b3e\u5f0f",
+    "\u54c1\u9805\u689d\u78bc"
+  ];
+  const headerIndex = rows.findIndex((row) => {
+    const cells = row.map((cell) => String(cell).trim());
+    return requiredHeaders.every((header) => cells.includes(header));
+  });
+
+  if (headerIndex < 0) {
+    return { error: `\u627e\u4e0d\u5230\u5fc5\u8981\u6b04\u4f4d\uff1a${requiredHeaders.join("\u3001")}` };
+  }
+
+  const headers = rows[headerIndex].map((cell) => String(cell).trim());
+  const indexOf = (name) => headers.indexOf(name);
+  const indexOfAny = (names) => names.map(indexOf).find((entry) => entry >= 0) ?? -1;
+  const marketIndex = indexOf("\u8ce3\u5834\u540d\u7a31");
+  const productIndex = indexOf("\u5546\u54c1\u540d\u7a31");
+  const descriptionIndex = indexOf("\u5546\u54c1\u8aaa\u660e");
+  const productImageIndex = indexOf("\u5546\u54c1\u5716\u7247\u7db2\u5740");
+  const variantIndex = indexOf("\u6b3e\u5f0f");
+  const barcodeIndex = indexOf("\u54c1\u9805\u689d\u78bc");
+  const priceIndex = indexOfAny(["\u6563\u8ca8\u552e\u50f9", "\u552e\u50f9"]);
+  const stockIndex = indexOfAny(["\u6563\u8ca8\u5eab\u5b58", "\u6578\u91cf"]);
+  const boxPriceIndex = indexOf("\u6574\u7bb1\u552e\u50f9");
+  const boxStockIndex = indexOf("\u6574\u7bb1\u5eab\u5b58");
+  const variantImageIndex = indexOf("\u54c1\u9805\u5716\u7247\u7db2\u5740");
+  const activeIndex = indexOf("\u662f\u5426\u4e0a\u67b6");
+  const boxEnabledIndex = indexOf("\u6574\u7bb1\u4e0a\u67b6");
+
+  if (priceIndex < 0 || stockIndex < 0) {
+    return { error: "\u627e\u4e0d\u5230\u50f9\u683c\u6216\u5eab\u5b58\u6b04\u4f4d\uff1a\u8acb\u4f7f\u7528\u6563\u8ca8\u552e\u50f9\u3001\u6563\u8ca8\u5eab\u5b58\uff08\u6216\u820a\u6b04\u4f4d\u552e\u50f9\u3001\u6578\u91cf\uff09" };
+  }
+
+  const items = [];
+  for (const row of rows.slice(headerIndex + 1)) {
+    const marketName = String(row[marketIndex] || "").trim();
+    const productName = String(row[productIndex] || "").trim();
+    const variantName = String(row[variantIndex] || "").trim();
+    const barcode = String(row[barcodeIndex] || "").trim();
+    const price = Number(row[priceIndex]);
+    const stock = Number(row[stockIndex]);
+
+    if (!marketName && !productName && !variantName && !barcode) continue;
+    if (!marketName || !productName || !variantName || !barcode) {
+      return { error: `\u8cc7\u6599\u5217\u7f3a\u5c11\u5fc5\u8981\u6b04\u4f4d\uff1a${barcode || productName || marketName || "\u7a7a\u767d\u5217"}` };
+    }
+    if (!Number.isFinite(price) || price < 0) return { error: `${barcode} \u6563\u8ca8\u552e\u50f9\u683c\u5f0f\u932f\u8aa4` };
+    if (!Number.isInteger(stock) || stock < 0) return { error: `${barcode} \u6563\u8ca8\u5eab\u5b58\u683c\u5f0f\u932f\u8aa4` };
+
+    const rawBoxPrice = boxPriceIndex >= 0 ? row[boxPriceIndex] : "";
+    const rawBoxStock = boxStockIndex >= 0 ? row[boxStockIndex] : "";
+    const boxPrice = rawBoxPrice === "" ? Math.round(price) : Number(rawBoxPrice);
+    const boxStock = rawBoxStock === "" ? 0 : Number(rawBoxStock);
+    if (!Number.isFinite(boxPrice) || boxPrice < 0) return { error: `${barcode} \u6574\u7bb1\u552e\u50f9\u683c\u5f0f\u932f\u8aa4` };
+    if (!Number.isInteger(boxStock) || boxStock < 0) return { error: `${barcode} \u6574\u7bb1\u5eab\u5b58\u683c\u5f0f\u932f\u8aa4` };
+
+    items.push({
+      marketName,
+      productName,
+      productDescription: descriptionIndex >= 0 ? String(row[descriptionIndex] || "").trim() : "",
+      productImageUrl: productImageIndex >= 0 ? String(row[productImageIndex] || "").trim() : "",
+      variantName,
+      barcode,
+      price: Math.round(price),
+      boxPrice: Math.round(boxPrice),
+      stock,
+      boxStock,
+      variantImageUrl: variantImageIndex >= 0 ? String(row[variantImageIndex] || "").trim() : "",
+      isActive: activeIndex >= 0 ? parseActiveValue(row[activeIndex]) : true,
+      boxEnabled: boxEnabledIndex >= 0 ? parseActiveValue(row[boxEnabledIndex]) : false
+    });
+  }
+
+  if (items.length === 0) return { error: "\u0045\u0078\u0063\u0065\u006c \u6c92\u6709\u53ef\u532f\u5165\u7684\u5546\u54c1\u8cc7\u6599" };
+  return { items };
+}
+
+function parseActiveValue(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return true;
+  return ["\u662f", "\u4e0a\u67b6", "\u958b", "\u958b\u555f", "true", "1", "yes", "y"].includes(text);
+}
+
+function createProductImportTemplateBuffer() {
+  const headers = [
+    "\u8ce3\u5834\u540d\u7a31",
+    "\u5546\u54c1\u540d\u7a31",
+    "\u5546\u54c1\u8aaa\u660e",
+    "\u5546\u54c1\u5716\u7247\u7db2\u5740",
+    "\u6b3e\u5f0f",
+    "\u54c1\u9805\u689d\u78bc",
+    "\u6563\u8ca8\u552e\u50f9",
+    "\u6563\u8ca8\u5eab\u5b58",
+    "\u6574\u7bb1\u552e\u50f9",
+    "\u6574\u7bb1\u5eab\u5b58",
+    "\u54c1\u9805\u5716\u7247\u7db2\u5740",
+    "\u662f\u5426\u4e0a\u67b6",
+    "\u6574\u7bb1\u4e0a\u67b6"
+  ];
+  const rows = [
+    headers,
+    [
+      "\u9810\u8a2d\u8ce3\u5834",
+      "\u9ad8\u5f48\u529b\u9eb5\u5305\u62d6\u978b",
+      "\u5546\u54c1\u8aaa\u660e\u53ef\u7559\u7a7a",
+      "",
+      "\u6a59\u8272 / M(40-41) \u9577\u5ea6\u7d04 26cm",
+      "AA0077-01",
+      89,
+      10,
+      890,
+      2,
+      "",
+      "\u662f",
+      "\u5426"
+    ]
+  ];
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet["!cols"] = headers.map((header) => ({ wch: Math.max(14, header.length + 6) }));
+  XLSX.utils.book_append_sheet(workbook, sheet, "\u5546\u54c1\u4e0a\u67b6");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
 app.get("/api/orders", requireAdminApi, async (_req, res) => {
