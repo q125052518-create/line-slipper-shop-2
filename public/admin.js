@@ -88,12 +88,12 @@ function variantRow(variant = {}) {
         <input name="barcode" placeholder="例如 AA0077-01" value="${escapeHtml(variant.barcode || "")}" required>
       </label>
       <label data-stock-field="loose">
-        ????
-        <input name="price" type="number" min="0" step="1" placeholder="????" value="${escapeHtml(variant.price ?? "")}" required>
+        散貨售價
+        <input name="price" type="number" min="0" step="1" placeholder="散貨售價" value="${escapeHtml(variant.price ?? "")}" required>
       </label>
       <label data-stock-field="box">
-        ????
-        <input name="boxPrice" type="number" min="0" step="1" placeholder="????" value="${escapeHtml(variant.boxPrice ?? variant.price ?? "")}" required>
+        整箱售價
+        <input name="boxPrice" type="number" min="0" step="1" placeholder="整箱售價" value="${escapeHtml(variant.boxPrice ?? variant.price ?? "")}" required>
       </label>
       <label data-stock-field="loose">
         散貨庫存
@@ -116,7 +116,6 @@ function variantRow(variant = {}) {
     </div>
   `;
 }
-
 function primaryMarket() {
   return catalog.markets[0] || null;
 }
