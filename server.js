@@ -448,8 +448,6 @@ function normalizeCatalog(catalog) {
         const stock = Number(variant.stock);
         const boxStock = Number(variant.boxStock);
         variant.price = Number.isFinite(price) && price >= 0 ? Math.round(price) : 0;
-  if (!Number.isFinite(boxPrice) || boxPrice < 0) throw new Error("Invalid box price");
-  if (!Number.isFinite(boxPrice) || boxPrice < 0) throw new Error("?????????");
         variant.boxPrice = Number.isFinite(boxPrice) && boxPrice >= 0 ? Math.round(boxPrice) : variant.price;
         variant.stock = Number.isInteger(stock) && stock >= 0 ? stock : 0;
         variant.boxStock = Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0;
