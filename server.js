@@ -1832,22 +1832,23 @@ app.post("/api/admin/products/import", async (req, res) => {
   let createdProducts = 0;
   let createdVariants = 0;
   let updatedVariants = 0;
+  let primaryMarket = catalog.markets[0];
 
   for (const item of parsed.items) {
-    let market = catalog.markets.find((entry) => entry.name.trim() === item.marketName);
-    if (!market) {
-      market = {
+    if (!primaryMarket) {
+      primaryMarket = {
         id: makeId("market"),
-        name: item.marketName,
+        name: item.marketName || "\u9810\u8a2d\u8ce3\u5834",
         description: "",
-        isActive: item.isActive,
+        isActive: true,
         products: []
       };
-      catalog.markets.push(market);
+      catalog.markets.push(primaryMarket);
       createdMarkets += 1;
     }
 
-    market.isActive = item.isActive;
+    const market = primaryMarket;
+    market.isActive = true;
     let product = market.products.find((entry) => entry.name.trim() === item.productName);
     if (!product) {
       product = {
@@ -1864,7 +1865,7 @@ app.post("/api/admin/products/import", async (req, res) => {
     } else {
       product.description = item.productDescription || product.description || "";
       product.imageUrl = item.productImageUrl || product.imageUrl || "";
-      product.boxEnabled = product.boxEnabled || item.boxEnabled;
+      product.boxEnabled = item.boxEnabled;
     }
 
     const variant = product.variants.find((entry) => entry.barcode.trim().toUpperCase() === item.barcode.toUpperCase());
@@ -2787,7 +2788,7 @@ function parseProductImportRows(rows) {
       boxStock,
       variantImageUrl: variantImageIndex >= 0 ? String(row[variantImageIndex] || "").trim() : "",
       isActive: activeIndex >= 0 ? parseActiveValue(row[activeIndex]) : true,
-      boxEnabled: boxEnabledIndex >= 0 ? parseActiveValue(row[boxEnabledIndex]) : false
+      boxEnabled: boxEnabledIndex >= 0 ? parseActiveValue(row[boxEnabledIndex]) : true
     });
   }
 
