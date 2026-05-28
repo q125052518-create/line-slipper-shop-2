@@ -874,7 +874,6 @@ function normalizeVariant(input, existingId) {
 function normalizeProduct(input, existingId) {
   const name = String(input.name || "").trim();
   const imageUrl = String(input.imageUrl || "").trim();
-  const description = String(input.description || "").trim();
   const stockType = normalizeProductStockType(input.stockType);
   const boxEnabled = input.boxEnabled === true;
   const variants = Array.isArray(input.variants) ? input.variants : [];
@@ -886,7 +885,6 @@ function normalizeProduct(input, existingId) {
     id: existingId || input.id || makeId("product"),
     name,
     imageUrl,
-    description,
     stockType,
     boxEnabled,
     variants: variants.map((variant) => normalizeVariant(variant, variant.id))
@@ -1855,7 +1853,6 @@ app.post("/api/admin/products/import", async (req, res) => {
         id: makeId("product"),
         name: item.productName,
         imageUrl: item.productImageUrl,
-        description: item.productDescription,
         stockType: "inStock",
         boxEnabled: item.boxEnabled,
         variants: []
@@ -1863,7 +1860,6 @@ app.post("/api/admin/products/import", async (req, res) => {
       market.products.push(product);
       createdProducts += 1;
     } else {
-      product.description = item.productDescription || product.description || "";
       product.imageUrl = item.productImageUrl || product.imageUrl || "";
       product.boxEnabled = item.boxEnabled;
     }
@@ -2666,7 +2662,6 @@ function parseProductImportRowsLegacy(rows) {
   const indexOf = (name) => headers.indexOf(name);
   const marketIndex = indexOf("賣場名稱");
   const productIndex = indexOf("商品名稱");
-  const descriptionIndex = indexOf("商品說明");
   const productImageIndex = indexOf("商品圖片網址");
   const variantIndex = indexOf("款式");
   const barcodeIndex = indexOf("品項條碼");
@@ -2694,7 +2689,6 @@ function parseProductImportRowsLegacy(rows) {
     items.push({
       marketName,
       productName,
-      productDescription: descriptionIndex >= 0 ? String(row[descriptionIndex] || "").trim() : "",
       productImageUrl: productImageIndex >= 0 ? String(row[productImageIndex] || "").trim() : "",
       variantName,
       barcode,
@@ -2734,7 +2728,6 @@ function parseProductImportRows(rows) {
   const indexOfAny = (names) => names.map(indexOf).find((entry) => entry >= 0) ?? -1;
   const marketIndex = indexOf("\u8ce3\u5834\u540d\u7a31");
   const productIndex = indexOf("\u5546\u54c1\u540d\u7a31");
-  const descriptionIndex = indexOf("\u5546\u54c1\u8aaa\u660e");
   const productImageIndex = indexOf("\u5546\u54c1\u5716\u7247\u7db2\u5740");
   const variantIndex = indexOf("\u6b3e\u5f0f");
   const barcodeIndex = indexOf("\u54c1\u9805\u689d\u78bc");
@@ -2776,7 +2769,6 @@ function parseProductImportRows(rows) {
     items.push({
       marketName,
       productName,
-      productDescription: descriptionIndex >= 0 ? String(row[descriptionIndex] || "").trim() : "",
       productImageUrl: productImageIndex >= 0 ? String(row[productImageIndex] || "").trim() : "",
       variantName,
       barcode,

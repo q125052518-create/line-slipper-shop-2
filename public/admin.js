@@ -284,10 +284,6 @@ function renderNewProductEditor(market) {
         </label>
         ${productStockTypeField()}
         ${productBoxEnabledField(false)}
-        <label>
-          商品說明
-          <textarea name="description" rows="3"></textarea>
-        </label>
         <div class="variant-editor">
           ${variantRow()}
         </div>
@@ -324,7 +320,7 @@ function renderProductEditor(market, product) {
           </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
-            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""} ${escapeHtml(product.description || "")}</p>
+            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""}</p>
           </div>
         </div>
         <label>
@@ -332,10 +328,6 @@ function renderProductEditor(market, product) {
           <input name="name" value="${escapeHtml(product.name)}" required>
         </label>
         ${productStockTypeField(product.stockType)}
-        <label>
-          商品說明
-          <textarea name="description" rows="2">${escapeHtml(product.description || "")}</textarea>
-        </label>
         <div class="variant-editor">
           ${product.variants.map((variant) => variantRow(variant)).join("")}
         </div>
@@ -510,7 +502,6 @@ document.addEventListener("submit", async (event) => {
         imageUrl,
         stockType: formData.get("stockType"),
         boxEnabled: formData.get("boxEnabled") === "on",
-        description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
     });
@@ -561,7 +552,6 @@ document.addEventListener("submit", async (event) => {
         imageUrl,
         stockType: formData.get("stockType"),
         boxEnabled: formData.get("boxEnabled") === "on",
-        description: formData.get("description"),
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
     });
