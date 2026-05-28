@@ -8,6 +8,8 @@ const productSearchCountEl = document.querySelector("#productSearchCount");
 
 let catalog = { markets: [] };
 let draggedVariantRow = null;
+let dragAutoScrollFrame = 0;
+let dragPointerY = 0;
 let selectedProductId = "";
 let isCreatingProduct = false;
 let productSearchQuery = "";
@@ -127,6 +129,30 @@ function firstVariant(product) {
 function productTileImage(product) {
   const variant = firstVariant(product);
   return variant?.imageUrl || product?.imageUrl || "https://placehold.co/300x300/f2efe8/1e2720?text=Slipper";
+}
+
+function stopDragAutoScroll() {
+  if (dragAutoScrollFrame) cancelAnimationFrame(dragAutoScrollFrame);
+  dragAutoScrollFrame = 0;
+}
+
+function runDragAutoScroll() {
+  if (!draggedVariantRow) {
+    stopDragAutoScroll();
+    return;
+  }
+
+  const edgeSize = 120;
+  const maxSpeed = 24;
+  let delta = 0;
+  if (dragPointerY < edgeSize) {
+    delta = -Math.ceil(((edgeSize - dragPointerY) / edgeSize) * maxSpeed);
+  } else if (dragPointerY > window.innerHeight - edgeSize) {
+    delta = Math.ceil(((dragPointerY - (window.innerHeight - edgeSize)) / edgeSize) * maxSpeed);
+  }
+
+  if (delta) window.scrollBy(0, delta);
+  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
 }
 
 function productStockType(product) {
@@ -446,13 +472,17 @@ document.addEventListener("dragstart", (event) => {
   if (!handle) return;
 
   draggedVariantRow = handle.closest("[data-variant-row]");
+  dragPointerY = event.clientY || window.innerHeight / 2;
   draggedVariantRow.classList.add("is-dragging");
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", draggedVariantRow.dataset.variantId || "variant");
+  stopDragAutoScroll();
+  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
 });
 
 document.addEventListener("dragover", (event) => {
   if (!draggedVariantRow) return;
+  dragPointerY = event.clientY;
 
   const targetRow = event.target.closest("[data-variant-row]");
   if (!targetRow || targetRow === draggedVariantRow) return;
@@ -481,7 +511,13 @@ document.addEventListener("dragend", () => {
   });
   if (draggedVariantRow) draggedVariantRow.classList.remove("is-dragging");
   draggedVariantRow = null;
+  stopDragAutoScroll();
 });
+
+document.addEventListener("wheel", (event) => {
+  if (!draggedVariantRow) return;
+  window.scrollBy(0, event.deltaY);
+}, { passive: true });
 
 document.addEventListener("submit", async (event) => {
   if (event.target.matches("[data-create-product]")) {
