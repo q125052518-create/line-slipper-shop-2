@@ -2808,7 +2808,6 @@ function productNameFromBarcode(barcode) {
 
 function createProductImportTemplateBuffer() {
   const headers = [
-    "\u5546\u54c1\u8aaa\u660e",
     "\u5546\u54c1\u5716\u7247\u7db2\u5740",
     "\u6b3e\u5f0f",
     "\u54c1\u9805\u689d\u78bc",
@@ -2823,7 +2822,6 @@ function createProductImportTemplateBuffer() {
   const rows = [
     headers,
     [
-      "\u5546\u54c1\u8aaa\u660e\u53ef\u7559\u7a7a",
       "",
       "\u6a59\u8272 / M(40-41) \u9577\u5ea6\u7d04 26cm",
       "AZ0402-01",

@@ -123,6 +123,10 @@ function productHasAvailableStock(product) {
 
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
+    const stockRankA = productHasAvailableStock(a) ? 0 : 1;
+    const stockRankB = productHasAvailableStock(b) ? 0 : 1;
+    if (stockRankA !== stockRankB) return stockRankA - stockRankB;
+
     const rankA = effectiveProductStockType(a) === "preOrder" ? 0 : 1;
     const rankB = effectiveProductStockType(b) === "preOrder" ? 0 : 1;
     return rankA - rankB;
@@ -246,7 +250,6 @@ function renderProductDetail(market, product) {
       </span>
       <div class="product-body">
         <h3>${escapeHtml(product.name)} <span class="stock-type-inline is-${effectiveProductStockType(product)}">${productStockLabel(product)}</span></h3>
-        ${product.description ? `<p>${escapeHtml(product.description)}</p>` : ""}
         <div class="variant-card-grid" role="list" aria-label="${escapeHtml(product.name)}選項">
           ${product.variants.map((variant) => {
             const isSelected = selected?.id === variant.id;
