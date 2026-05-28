@@ -78,7 +78,7 @@ function resetImageUploaders(form) {
 function variantRow(variant = {}) {
   return `
     <div class="variant-row" data-variant-row data-variant-id="${escapeHtml(variant.id || "")}">
-      <button type="button" class="drag-handle" draggable="true" data-drag-variant title="拖曳排序" aria-label="拖曳排序">
+      <button type="button" class="drag-handle" data-drag-variant title="拖曳排序" aria-label="拖曳排序">
         <span aria-hidden="true"></span>
       </button>
       <label>
@@ -153,6 +153,45 @@ function runDragAutoScroll() {
 
   if (delta) window.scrollBy(0, delta);
   dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
+}
+
+function clearVariantDropMarkers(editor = document) {
+  editor.querySelectorAll("[data-variant-row]").forEach((row) => {
+    row.classList.remove("is-drop-before", "is-drop-after");
+  });
+}
+
+function moveDraggedVariant(clientY, targetRow = null) {
+  if (!draggedVariantRow) return;
+  dragPointerY = clientY || dragPointerY || window.innerHeight / 2;
+
+  const sourceEditor = draggedVariantRow.closest(".variant-editor");
+  const row = targetRow || document.elementFromPoint(window.innerWidth / 2, dragPointerY)?.closest?.("[data-variant-row]");
+  if (!row || row === draggedVariantRow || row.closest(".variant-editor") !== sourceEditor) return;
+
+  const targetRect = row.getBoundingClientRect();
+  const shouldPlaceAfter = dragPointerY > targetRect.top + targetRect.height / 2;
+  clearVariantDropMarkers(sourceEditor);
+  row.classList.add(shouldPlaceAfter ? "is-drop-after" : "is-drop-before");
+  sourceEditor.insertBefore(draggedVariantRow, shouldPlaceAfter ? row.nextSibling : row);
+}
+
+function startVariantDrag(row, clientY) {
+  if (!row) return;
+  draggedVariantRow = row;
+  dragPointerY = clientY || window.innerHeight / 2;
+  draggedVariantRow.classList.add("is-dragging");
+  document.body.classList.add("is-variant-dragging");
+  stopDragAutoScroll();
+  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
+}
+
+function endVariantDrag() {
+  clearVariantDropMarkers();
+  if (draggedVariantRow) draggedVariantRow.classList.remove("is-dragging");
+  draggedVariantRow = null;
+  document.body.classList.remove("is-variant-dragging");
+  stopDragAutoScroll();
 }
 
 function productStockType(product) {
@@ -471,33 +510,15 @@ document.addEventListener("dragstart", (event) => {
   const handle = event.target.closest("[data-drag-variant]");
   if (!handle) return;
 
-  draggedVariantRow = handle.closest("[data-variant-row]");
-  dragPointerY = event.clientY || window.innerHeight / 2;
-  draggedVariantRow.classList.add("is-dragging");
+  startVariantDrag(handle.closest("[data-variant-row]"), event.clientY);
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", draggedVariantRow.dataset.variantId || "variant");
-  stopDragAutoScroll();
-  dragAutoScrollFrame = requestAnimationFrame(runDragAutoScroll);
 });
 
 document.addEventListener("dragover", (event) => {
   if (!draggedVariantRow) return;
-  dragPointerY = event.clientY;
-
-  const targetRow = event.target.closest("[data-variant-row]");
-  if (!targetRow || targetRow === draggedVariantRow) return;
-
-  const sourceEditor = draggedVariantRow.closest(".variant-editor");
-  if (targetRow.closest(".variant-editor") !== sourceEditor) return;
-
   event.preventDefault();
-  const targetRect = targetRow.getBoundingClientRect();
-  const shouldPlaceAfter = event.clientY > targetRect.top + targetRect.height / 2;
-  sourceEditor.querySelectorAll("[data-variant-row]").forEach((row) => {
-    row.classList.remove("is-drop-before", "is-drop-after");
-  });
-  targetRow.classList.add(shouldPlaceAfter ? "is-drop-after" : "is-drop-before");
-  sourceEditor.insertBefore(draggedVariantRow, shouldPlaceAfter ? targetRow.nextSibling : targetRow);
+  moveDraggedVariant(event.clientY, event.target.closest("[data-variant-row]"));
 });
 
 document.addEventListener("drop", (event) => {
@@ -506,17 +527,31 @@ document.addEventListener("drop", (event) => {
 });
 
 document.addEventListener("dragend", () => {
-  document.querySelectorAll("[data-variant-row]").forEach((row) => {
-    row.classList.remove("is-drop-before", "is-drop-after");
-  });
-  if (draggedVariantRow) draggedVariantRow.classList.remove("is-dragging");
-  draggedVariantRow = null;
-  stopDragAutoScroll();
+  endVariantDrag();
+});
+
+document.addEventListener("mousedown", (event) => {
+  const handle = event.target.closest("[data-drag-variant]");
+  if (!handle) return;
+  event.preventDefault();
+  startVariantDrag(handle.closest("[data-variant-row]"), event.clientY);
+});
+
+document.addEventListener("mousemove", (event) => {
+  if (!draggedVariantRow) return;
+  event.preventDefault();
+  moveDraggedVariant(event.clientY, event.target.closest("[data-variant-row]"));
+});
+
+document.addEventListener("mouseup", () => {
+  if (!draggedVariantRow) return;
+  endVariantDrag();
 });
 
 document.addEventListener("wheel", (event) => {
   if (!draggedVariantRow) return;
   window.scrollBy(0, event.deltaY);
+  moveDraggedVariant(dragPointerY);
 }, { passive: true });
 
 document.addEventListener("submit", async (event) => {

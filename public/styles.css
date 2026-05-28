@@ -1067,6 +1067,11 @@ button.drag-handle:active {
   cursor: grabbing;
 }
 
+body.is-variant-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .order h3 {
   font-size: 20px;
   margin-bottom: 4px;
