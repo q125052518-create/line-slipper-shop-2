@@ -2717,7 +2717,6 @@ function parseActiveValueLegacy(value) {
 
 function parseProductImportRows(rows) {
   const requiredHeaders = [
-    "\u8ce3\u5834\u540d\u7a31",
     "\u5546\u54c1\u540d\u7a31",
     "\u6b3e\u5f0f",
     "\u54c1\u9805\u689d\u78bc"
@@ -2754,15 +2753,15 @@ function parseProductImportRows(rows) {
 
   const items = [];
   for (const row of rows.slice(headerIndex + 1)) {
-    const marketName = String(row[marketIndex] || "").trim();
+    const marketName = marketIndex >= 0 ? String(row[marketIndex] || "").trim() : "";
     const productName = String(row[productIndex] || "").trim();
     const variantName = String(row[variantIndex] || "").trim();
     const barcode = String(row[barcodeIndex] || "").trim();
     const price = Number(row[priceIndex]);
     const stock = Number(row[stockIndex]);
 
-    if (!marketName && !productName && !variantName && !barcode) continue;
-    if (!marketName || !productName || !variantName || !barcode) {
+    if (!productName && !variantName && !barcode) continue;
+    if (!productName || !variantName || !barcode) {
       return { error: `\u8cc7\u6599\u5217\u7f3a\u5c11\u5fc5\u8981\u6b04\u4f4d\uff1a${barcode || productName || marketName || "\u7a7a\u767d\u5217"}` };
     }
     if (!Number.isFinite(price) || price < 0) return { error: `${barcode} \u6563\u8ca8\u552e\u50f9\u683c\u5f0f\u932f\u8aa4` };
@@ -2804,7 +2803,6 @@ function parseActiveValue(value) {
 
 function createProductImportTemplateBuffer() {
   const headers = [
-    "\u8ce3\u5834\u540d\u7a31",
     "\u5546\u54c1\u540d\u7a31",
     "\u5546\u54c1\u8aaa\u660e",
     "\u5546\u54c1\u5716\u7247\u7db2\u5740",
@@ -2821,7 +2819,6 @@ function createProductImportTemplateBuffer() {
   const rows = [
     headers,
     [
-      "\u9810\u8a2d\u8ce3\u5834",
       "\u9ad8\u5f48\u529b\u9eb5\u5305\u62d6\u978b",
       "\u5546\u54c1\u8aaa\u660e\u53ef\u7559\u7a7a",
       "",
