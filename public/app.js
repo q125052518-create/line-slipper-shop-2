@@ -112,6 +112,15 @@ function variantDisplayPrice(variant) {
   return state.orderType === "box" ? Number(variant?.boxPrice || 0) : Number(variant?.price || 0);
 }
 
+function productRequiresStock(product) {
+  return state.orderType === "box" || effectiveProductStockType(product) !== "preOrder";
+}
+
+function productHasAvailableStock(product) {
+  if (!productRequiresStock(product)) return true;
+  return (product?.variants || []).some((variant) => variantDisplayStock(variant) > 0);
+}
+
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
     const rankA = effectiveProductStockType(a) === "preOrder" ? 0 : 1;
@@ -203,12 +212,13 @@ function renderProductOverview(market) {
       ${products.map((product) => {
     const variant = firstVariant(product);
     const imageUrl = variantImage(product, variant);
+    const isSoldOut = !productHasAvailableStock(product);
 
     return `
-      <button type="button" class="product-tile" data-open-product="${product.id}">
+      <button type="button" class="product-tile ${isSoldOut ? "is-sold-out" : ""}" data-open-product="${product.id}">
         <span class="product-image-wrap">
           <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
-          <em class="stock-type-badge is-${effectiveProductStockType(product)}">${productStockLabel(product)}</em>
+          <em class="stock-type-badge is-${isSoldOut ? "soldOut" : effectiveProductStockType(product)}">${isSoldOut ? "無庫存" : productStockLabel(product)}</em>
         </span>
         <strong>${escapeHtml(product.name)}</strong>
       </button>
@@ -222,8 +232,9 @@ function renderProductDetail(market, product) {
   const selected = selectedVariant(product);
   const imageUrl = variantImage(product, selected);
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
+  const requiresStock = productRequiresStock(product);
   const selectedStock = variantDisplayStock(selected);
-  const disabled = !selected || selectedStock <= 0;
+  const disabled = !selected || (requiresStock && selectedStock <= 0);
 
   productsEl.className = "product-detail-wrap";
   productsEl.innerHTML = `
@@ -245,13 +256,13 @@ function renderProductDetail(market, product) {
                 class="variant-card ${isSelected ? "is-selected" : ""}"
                 data-select-variant="${product.id}"
                 data-variant-id="${variant.id}"
-                ${variantDisplayStock(variant) <= 0 ? "data-sold-out=\"true\"" : ""}
+                ${requiresStock && variantDisplayStock(variant) <= 0 ? "data-sold-out=\"true\"" : ""}
               >
                 <img src="${escapeHtml(variantImage(product, variant))}" alt="${escapeHtml(variant.name)}">
                 <span>${escapeHtml(variant.name)}</span>
                 <small>${escapeHtml(variant.barcode)}</small>
                 <strong>${formatMoney(variantDisplayPrice(variant))}</strong>
-                <em>${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${variantDisplayStock(variant)}</em>
+                <em>${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${variantDisplayStock(variant)}` : "預購"}</em>
               </button>
             `;
           }).join("")}
@@ -259,10 +270,10 @@ function renderProductDetail(market, product) {
       </div>
       <div class="product-actions">
         <strong data-price-line="${product.id}">${formatMoney(variantDisplayPrice(selected))}</strong>
-        <p class="stock-line" data-stock-line="${product.id}">${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}</p>
+        <p class="stock-line" data-stock-line="${product.id}">${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}` : "預購不限制庫存"}</p>
         <label class="quantity-field">
           數量
-          <input type="number" min="1" max="${selectedStock || 1}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
+          <input type="number" min="1" max="${requiresStock ? (selectedStock || 1) : 999}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
         </label>
         <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "缺貨" : "加入購物車"}</button>
       </div>
@@ -281,9 +292,10 @@ function addToCart(productId) {
   const product = market?.products.find((entry) => entry.id === productId);
   const variant = product ? selectedVariant(product) : null;
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
+  const requiresStock = productRequiresStock(product);
   const availableStock = variantDisplayStock(variant);
   if (state.orderType === "box" && product?.boxEnabled !== true) return;
-  if (!market || !product || !variant || availableStock <= 0) return;
+  if (!market || !product || !variant || (requiresStock && availableStock <= 0)) return;
 
   const key = cartKey(market.id, product.id, variant.id);
   const quantityInput = document.querySelector(`[data-add-quantity="${product.id}"]`);
@@ -294,7 +306,7 @@ function addToCart(productId) {
     return;
   }
 
-  if (currentQuantity + addQuantity > availableStock) {
+  if (requiresStock && currentQuantity + addQuantity > availableStock) {
     showMessage(`庫存不足，目前剩 ${availableStock}`, "error");
     return;
   }
@@ -313,7 +325,7 @@ function addToCart(productId) {
     variantName: variant.name,
     barcode: variant.barcode,
     price: variantDisplayPrice(variant),
-    stock: availableStock,
+    stock: requiresStock ? availableStock : 999,
     imageUrl: variant.imageUrl || product.imageUrl,
     quantity: currentQuantity + addQuantity
   };

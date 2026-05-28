@@ -318,6 +318,23 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   box-shadow: 0 0 0 2px rgba(17, 108, 91, 0.12);
 }
 
+.product-tile.is-sold-out {
+  background: #f1f1f1;
+  border-color: #d0d0d0;
+  color: #777777;
+}
+
+.product-tile.is-sold-out:hover {
+  background: #eeeeee;
+  border-color: #bcbcbc;
+  box-shadow: none;
+}
+
+.product-tile.is-sold-out img {
+  filter: grayscale(1);
+  opacity: 0.42;
+}
+
 .product-tile img {
   aspect-ratio: 1;
   background: #eee8dd;
@@ -370,6 +387,12 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
 .stock-type-badge.is-preOrder,
 .stock-type-inline.is-preOrder {
   background: #ee4d2d;
+  color: #ffffff;
+}
+
+.stock-type-badge.is-soldOut,
+.stock-type-inline.is-soldOut {
+  background: #6d6d6d;
   color: #ffffff;
 }
 
