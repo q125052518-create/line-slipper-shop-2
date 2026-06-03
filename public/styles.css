@@ -458,6 +458,87 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
 
 .admin-product-tile {
   min-height: 188px;
+  position: relative;
+}
+
+.admin-product-tile.is-selected {
+  border-color: #116c5b;
+  box-shadow: 0 0 0 2px rgba(17, 108, 91, 0.16);
+}
+
+.admin-product-open {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-product-select {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d5cec2;
+  border-radius: 5px;
+  display: flex;
+  height: 28px;
+  justify-content: center;
+  left: 12px;
+  position: absolute;
+  top: 12px;
+  width: 28px;
+  z-index: 3;
+}
+
+.admin-product-select input {
+  cursor: pointer;
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.admin-bulk-actions {
+  align-items: center;
+  background: #fffaf4;
+  border: 1px solid #ded8cd;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px;
+}
+
+.admin-bulk-select-all {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.admin-bulk-count {
+  color: #5b665f;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.admin-bulk-actions button {
+  border-radius: 4px;
+  padding: 9px 12px;
+}
+
+.admin-bulk-actions button[data-bulk-active-status="false"] {
+  background: #9b2f2f;
+}
+
+.admin-bulk-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .admin-product-price {

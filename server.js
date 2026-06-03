@@ -1311,6 +1311,31 @@ app.put("/api/admin/products/:productId", async (req, res) => {
   }
 });
 
+app.patch("/api/admin/products/active-status", async (req, res) => {
+  const productIds = Array.isArray(req.body.productIds)
+    ? [...new Set(req.body.productIds.map((id) => String(id || "").trim()).filter(Boolean))]
+    : [];
+  if (productIds.length === 0) return res.status(400).json({ message: "請先選擇商品" });
+
+  const isActive = req.body.isActive !== false;
+  const catalog = await readCatalog();
+  const productIdSet = new Set(productIds);
+  let updatedCount = 0;
+
+  for (const market of catalog.markets) {
+    for (const product of market.products || []) {
+      if (!productIdSet.has(product.id)) continue;
+      product.isActive = isActive;
+      updatedCount += 1;
+    }
+  }
+
+  if (updatedCount === 0) return res.status(404).json({ message: "找不到選取的商品" });
+
+  await writeCatalog(catalog);
+  res.json({ updatedCount, isActive });
+});
+
 app.delete("/api/admin/products/:productId", async (req, res) => {
   const catalog = await readCatalog();
   for (const market of catalog.markets) {

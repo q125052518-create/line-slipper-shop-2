@@ -14,6 +14,7 @@ let selectedProductId = "";
 let isCreatingProduct = false;
 let productSearchQuery = "";
 let adminInventoryMode = "loose";
+let selectedBulkProductIds = new Set();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -358,29 +359,47 @@ function renderCatalog() {
 function renderProductOverview(market) {
   const products = filteredProducts(market);
   updateProductSearchCount(products.length, market.products.length);
+  const visibleProductIds = products.map((product) => product.id);
+  const selectedVisibleCount = visibleProductIds.filter((id) => selectedBulkProductIds.has(id)).length;
+  const selectedTotalCount = selectedBulkProductIds.size;
+  const allVisibleSelected = visibleProductIds.length > 0 && selectedVisibleCount === visibleProductIds.length;
 
   catalogEditorEl.innerHTML = `
     <article class="market-editor" data-market-id="${market.id}">
       <div class="admin-list-actions">
-        <button type="button" class="add-product-button" data-open-new-product>＋ 新增商品</button>
+        <button type="button" class="add-product-button" data-open-new-product>? ????</button>
+      </div>
+      <div class="admin-bulk-actions">
+        <label class="admin-bulk-select-all">
+          <input type="checkbox" data-bulk-select-visible ${allVisibleSelected ? "checked" : ""} ${visibleProductIds.length === 0 ? "disabled" : ""}>
+          <span>&#21246;&#36984;&#30446;&#21069;&#30059;&#38754;&#21830;&#21697;</span>
+        </label>
+        <span class="admin-bulk-count">&#24050;&#36984; ${selectedTotalCount} &#20214;</span>
+        <button type="button" data-bulk-active-status="true" ${selectedTotalCount === 0 ? "disabled" : ""}>&#25209;&#37327;&#19978;&#26550;</button>
+        <button type="button" data-bulk-active-status="false" ${selectedTotalCount === 0 ? "disabled" : ""}>&#25209;&#37327;&#19979;&#26550;</button>
+        <button type="button" data-bulk-clear-selection ${selectedTotalCount === 0 ? "disabled" : ""}>&#28165;&#38500;&#21246;&#36984;</button>
       </div>
       <div class="product-overview-grid admin-product-overview">
         ${products.map((product) => `
-          <button type="button" class="product-tile admin-product-tile" data-open-admin-product="${product.id}">
-            <span class="product-image-wrap">
-              <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
-              <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
-              ${product.isActive === false ? '<em class="stock-type-badge is-inactive">下架</em>' : ""}
-            </span>
-            <strong>${escapeHtml(product.name)}</strong>
-            <span class="admin-product-price">${escapeHtml(productAdminPriceLabel(product))}</span>
-          </button>
-        `).join("") || '<p class="empty">找不到符合條件的商品</p>'}
+          <article class="product-tile admin-product-tile ${selectedBulkProductIds.has(product.id) ? "is-selected" : ""}">
+            <label class="admin-product-select" title="&#36984;&#21462;&#21830;&#21697;">
+              <input type="checkbox" data-bulk-product-id="${escapeHtml(product.id)}" ${selectedBulkProductIds.has(product.id) ? "checked" : ""}>
+            </label>
+            <button type="button" class="admin-product-open" data-open-admin-product="${product.id}">
+              <span class="product-image-wrap">
+                <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
+                <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+                ${product.isActive === false ? '<em class="stock-type-badge is-inactive">&#19979;&#26550;</em>' : ""}
+              </span>
+              <strong>${escapeHtml(product.name)}</strong>
+              <span class="admin-product-price">${escapeHtml(productAdminPriceLabel(product))}</span>
+            </button>
+          </article>
+        `).join("") || '<p class="empty">???????</p>'}
       </div>
     </article>
   `;
 }
-
 function renderNewProductEditor(market) {
   updateProductSearchCount(0, market.products.length);
 
@@ -457,6 +476,8 @@ function renderProductEditor(market, product) {
 
 async function loadCatalog() {
   catalog = await fetch("/api/admin/catalog").then((response) => response.json());
+  const productIds = new Set((catalog.markets || []).flatMap((market) => (market.products || []).map((product) => product.id)));
+  selectedBulkProductIds = new Set([...selectedBulkProductIds].filter((id) => productIds.has(id)));
   renderCatalog();
 }
 
@@ -523,6 +544,36 @@ document.addEventListener("click", async (event) => {
   if (event.target.matches("[data-add-variant]")) {
     const editor = event.target.closest("form").querySelector(".variant-editor");
     editor.insertAdjacentHTML("beforeend", variantRow());
+  }
+
+  if (event.target.matches("[data-bulk-clear-selection]")) {
+    selectedBulkProductIds.clear();
+    renderCatalog();
+    return;
+  }
+
+  const bulkActiveStatusButton = event.target.closest("[data-bulk-active-status]");
+  if (bulkActiveStatusButton) {
+    const productIds = [...selectedBulkProductIds];
+    if (productIds.length === 0) {
+      alert("請先選擇商品");
+      return;
+    }
+    const isActive = bulkActiveStatusButton.dataset.bulkActiveStatus === "true";
+    const response = await fetch("/api/admin/products/active-status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds, isActive })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.message || "批量更新失敗");
+      return;
+    }
+    selectedBulkProductIds.clear();
+    await loadCatalog();
+    alert(`${isActive ? "上架" : "下架"} ${data.updatedCount || productIds.length} 件商品`);
+    return;
   }
 
   if (event.target.matches("[data-apply-variant-bulk]")) {
@@ -714,6 +765,31 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("change", async (event) => {
+  if (event.target.matches("[data-bulk-product-id]")) {
+    const productId = event.target.dataset.bulkProductId;
+    if (event.target.checked) {
+      selectedBulkProductIds.add(productId);
+    } else {
+      selectedBulkProductIds.delete(productId);
+    }
+    renderCatalog();
+    return;
+  }
+
+  if (event.target.matches("[data-bulk-select-visible]")) {
+    const market = primaryMarket();
+    const products = market ? filteredProducts(market) : [];
+    for (const product of products) {
+      if (event.target.checked) {
+        selectedBulkProductIds.add(product.id);
+      } else {
+        selectedBulkProductIds.delete(product.id);
+      }
+    }
+    renderCatalog();
+    return;
+  }
+
   if (!event.target.matches('.image-uploader input[type="file"]')) return;
 
   const file = event.target.files[0];
