@@ -16,14 +16,17 @@ const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
 const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-me";
 const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
-const dataDir = path.join(__dirname, "data");
+const repoDataDir = path.join(__dirname, "data");
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : (process.env.RENDER ? "/var/data" : repoDataDir);
 const ordersFile = path.join(dataDir, "orders.json");
 const buyersFile = path.join(dataDir, "buyers.json");
 const chatsFile = path.join(dataDir, "chats.json");
 const catalogFile = path.join(dataDir, "catalog.json");
 const mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
 const mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
-const mallbicOrderTemplateFile = path.join(dataDir, "mallbic-order-template.xls");
+const mallbicOrderTemplateFile = path.join(repoDataDir, "mallbic-order-template.xls");
 const orderBackupsDir = path.join(dataDir, "order-backups");
 const mallbicLoginUrl = process.env.MALLBIC_LOGIN_URL || "https://ec.mallbic.com/Module/0_Login/Login.aspx?sid=g5c071iv";
 const mallbicCompanyName = process.env.MALLBIC_COMPANY_NAME || "祥瑞華有限公司";
@@ -280,15 +283,23 @@ async function ensureStore() {
   await ensureJsonFile(ordersFile, []);
   await ensureJsonFile(buyersFile, []);
   await ensureJsonFile(chatsFile, []);
-  await ensureJsonFile(catalogFile, defaultCatalog);
-  await ensureJsonFile(mallbicSyncFile, defaultMallbicSyncStatus);
-  await ensureJsonFile(mallbicOrderSyncFile, defaultMallbicOrderSyncStatus);
+  await ensureJsonFile(catalogFile, defaultCatalog, path.join(repoDataDir, "catalog.json"));
+  await ensureJsonFile(mallbicSyncFile, defaultMallbicSyncStatus, path.join(repoDataDir, "mallbic-sync.json"));
+  await ensureJsonFile(mallbicOrderSyncFile, defaultMallbicOrderSyncStatus, path.join(repoDataDir, "mallbic-order-sync.json"));
 }
 
-async function ensureJsonFile(filePath, fallback) {
+async function ensureJsonFile(filePath, fallback, seedFilePath = "") {
   try {
     await fs.access(filePath);
   } catch {
+    if (seedFilePath && path.resolve(seedFilePath) !== path.resolve(filePath)) {
+      try {
+        await fs.copyFile(seedFilePath, filePath);
+        return;
+      } catch {
+        // Fall back to the in-code default if the seed file is not available.
+      }
+    }
     await fs.writeFile(filePath, `${JSON.stringify(fallback, null, 2)}\n`, "utf8");
   }
 }
@@ -1186,6 +1197,19 @@ app.get("/api/markets", async (_req, res) => {
 
 app.get("/api/admin/catalog", async (_req, res) => {
   res.json(await readCatalog());
+});
+
+app.get("/api/admin/storage-status", async (_req, res) => {
+  const [orders, catalog] = await Promise.all([readOrders(), readCatalog()]);
+  res.json({
+    dataDir,
+    repoDataDir,
+    persistentDataDir: Boolean(process.env.DATA_DIR),
+    ordersFile,
+    catalogFile,
+    orderCount: orders.length,
+    productCount: catalog.markets.reduce((sum, market) => sum + (market.products || []).length, 0)
+  });
 });
 
 app.post("/api/admin/markets", async (req, res) => {
