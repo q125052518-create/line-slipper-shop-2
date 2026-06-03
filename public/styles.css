@@ -613,12 +613,16 @@ button.add-product-button:hover {
   background: #f7f4ee;
   border: 1px solid #ded8cd;
   border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(30, 39, 32, 0.08);
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   grid-column: 1 / -1;
   justify-content: center;
   padding: 12px;
+  position: sticky;
+  top: 8px;
+  z-index: 20;
 }
 
 .product-actions strong {
