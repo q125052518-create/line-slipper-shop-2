@@ -17,17 +17,16 @@ const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-m
 const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
 const repoDataDir = path.join(__dirname, "data");
-const dataDir = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : (process.env.RENDER ? "/var/data" : repoDataDir);
-const ordersFile = path.join(dataDir, "orders.json");
-const buyersFile = path.join(dataDir, "buyers.json");
-const chatsFile = path.join(dataDir, "chats.json");
-const catalogFile = path.join(dataDir, "catalog.json");
-const mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
-const mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
+const requestedDataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : repoDataDir;
+let dataDir = requestedDataDir;
+let ordersFile = path.join(dataDir, "orders.json");
+let buyersFile = path.join(dataDir, "buyers.json");
+let chatsFile = path.join(dataDir, "chats.json");
+let catalogFile = path.join(dataDir, "catalog.json");
+let mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
+let mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
 const mallbicOrderTemplateFile = path.join(repoDataDir, "mallbic-order-template.xls");
-const orderBackupsDir = path.join(dataDir, "order-backups");
+let orderBackupsDir = path.join(dataDir, "order-backups");
 const mallbicLoginUrl = process.env.MALLBIC_LOGIN_URL || "https://ec.mallbic.com/Module/0_Login/Login.aspx?sid=g5c071iv";
 const mallbicCompanyName = process.env.MALLBIC_COMPANY_NAME || "祥瑞華有限公司";
 const mallbicDefaultTimeoutMs = Number(process.env.MALLBIC_DEFAULT_TIMEOUT_MS || 30000);
@@ -279,7 +278,21 @@ app.get("/product-import-template.xlsx", (_req, res) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 async function ensureStore() {
-  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (error) {
+    if (dataDir === repoDataDir) throw error;
+    console.warn(`DATA_DIR ${dataDir} is not writable; falling back to ${repoDataDir}: ${getErrorMessage(error)}`);
+    dataDir = repoDataDir;
+    ordersFile = path.join(dataDir, "orders.json");
+    buyersFile = path.join(dataDir, "buyers.json");
+    chatsFile = path.join(dataDir, "chats.json");
+    catalogFile = path.join(dataDir, "catalog.json");
+    mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
+    mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
+    orderBackupsDir = path.join(dataDir, "order-backups");
+    await fs.mkdir(dataDir, { recursive: true });
+  }
   await ensureJsonFile(ordersFile, []);
   await ensureJsonFile(buyersFile, []);
   await ensureJsonFile(chatsFile, []);
@@ -1203,8 +1216,9 @@ app.get("/api/admin/storage-status", async (_req, res) => {
   const [orders, catalog] = await Promise.all([readOrders(), readCatalog()]);
   res.json({
     dataDir,
+    requestedDataDir,
     repoDataDir,
-    persistentDataDir: Boolean(process.env.DATA_DIR),
+    persistentDataDir: dataDir !== repoDataDir,
     ordersFile,
     catalogFile,
     orderCount: orders.length,
