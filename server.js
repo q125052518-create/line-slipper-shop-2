@@ -323,12 +323,82 @@ async function ensureJsonFile(filePath, fallback, seedFilePath = "") {
 async function readJson(filePath, fallback) {
   await ensureStore();
   const content = await fs.readFile(filePath, "utf8");
-  return content.trim() ? JSON.parse(content) : fallback;
+  const trimmed = content.trim();
+  if (!trimmed) return fallback;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    const recovered = parseFirstJsonValue(trimmed);
+    await backupCorruptJson(filePath, content, error);
+    if (recovered.ok) {
+      await writeJson(filePath, recovered.value);
+      return recovered.value;
+    }
+    await writeJson(filePath, fallback);
+    return fallback;
+  }
 }
 
 async function writeJson(filePath, value) {
   await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  const tempFile = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tempFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await fs.rename(tempFile, filePath);
+}
+
+function parseFirstJsonValue(text) {
+  const start = text.search(/\S/);
+  if (start < 0) return { ok: true, value: null };
+  const opener = text[start];
+  const closer = opener === "{" ? "}" : opener === "[" ? "]" : "";
+  if (!closer) return { ok: false };
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === opener) {
+      depth += 1;
+    } else if (char === closer) {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return { ok: true, value: JSON.parse(text.slice(start, index + 1)) };
+        } catch {
+          return { ok: false };
+        }
+      }
+    }
+  }
+
+  return { ok: false };
+}
+
+async function backupCorruptJson(filePath, content, error) {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupFile = `${filePath}.corrupt-${timestamp}`;
+    await fs.writeFile(backupFile, content, "utf8");
+    console.error(`Recovered corrupt JSON file ${filePath}; backup saved to ${backupFile}: ${getErrorMessage(error)}`);
+  } catch (backupError) {
+    console.error(`Could not backup corrupt JSON file ${filePath}: ${getErrorMessage(backupError)}`);
+  }
 }
 
 async function readOrders() {
