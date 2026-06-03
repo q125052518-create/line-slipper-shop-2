@@ -418,9 +418,15 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("input", (event) => {
   if (!event.target.matches("[data-product-search]")) return;
+  const selectionStart = event.target.selectionStart ?? event.target.value.length;
+  const selectionEnd = event.target.selectionEnd ?? selectionStart;
   state.productSearchQuery = event.target.value;
   renderProducts();
-  document.querySelector("[data-product-search]")?.focus();
+  const searchInput = document.querySelector("[data-product-search]");
+  if (searchInput) {
+    searchInput.focus();
+    searchInput.setSelectionRange(selectionStart, selectionEnd);
+  }
 });
 
 window.addEventListener("pageshow", reloadCart);
