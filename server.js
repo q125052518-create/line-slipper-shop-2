@@ -705,10 +705,10 @@ async function readMallbicOrderSyncStatus() {
   return {
     ...defaultMallbicOrderSyncStatus,
     ...await readJson(mallbicOrderSyncFile, defaultMallbicOrderSyncStatus),
-    enabled: mallbicOrderAutoSyncEnabled,
+    enabled: mallbicOrderAutoSyncEnabled && dataDir !== repoDataDir,
     intervalMs: mallbicOrderAutoSyncIntervalMs,
     running: mallbicOrderSyncRunning,
-    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled,
+    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled && dataDir !== repoDataDir,
     statusUpdateIntervalMs: mallbicOrderAutoSyncIntervalMs
   };
 }
@@ -717,10 +717,10 @@ async function writeMallbicOrderSyncStatus(status) {
   const nextStatus = {
     ...defaultMallbicOrderSyncStatus,
     ...status,
-    enabled: mallbicOrderAutoSyncEnabled,
+    enabled: mallbicOrderAutoSyncEnabled && dataDir !== repoDataDir,
     intervalMs: mallbicOrderAutoSyncIntervalMs,
     running: typeof status.running === "boolean" ? status.running : mallbicOrderSyncRunning,
-    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled,
+    statusUpdateAutoEnabled: mallbicOrderAutoSyncEnabled && dataDir !== repoDataDir,
     statusUpdateIntervalMs: mallbicOrderAutoSyncIntervalMs
   };
   await writeJson(mallbicOrderSyncFile, nextStatus);
@@ -3159,6 +3159,11 @@ function startMallbicAutoSync() {
 function startMallbicOrderAutoSync() {
   if (!mallbicOrderAutoSyncEnabled) {
     console.log("Mallbic order sync is disabled.");
+    return;
+  }
+
+  if (dataDir === repoDataDir) {
+    console.warn("Mallbic order sync is disabled because runtime data is not on a persistent disk.");
     return;
   }
 
