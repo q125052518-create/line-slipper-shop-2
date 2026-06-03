@@ -412,33 +412,24 @@ function normalizeChats(chats) {
 function normalizeOrderMallbicSync(order) {
   const current = order.mallbic && typeof order.mallbic === "object" ? order.mallbic : {};
   const cancelled = current.cancelStatus === "cancelled";
-  const lookupOnlyFailed = current.importStatus === "importFailed" && isMallbicPostImportLookupError(current.importError);
-  const importStatus = lookupOnlyFailed
-    ? "imported"
+  const missingMallbicOrderNo = current.importStatus === "imported" && !String(current.mallbicOrderNo || "").trim();
+  const importStatus = missingMallbicOrderNo
+    ? (order.status === "cancelled" ? "skipped" : "pending")
     : current.importStatus || (order.status === "cancelled" ? "skipped" : "pending");
   const imported = importStatus === "imported";
   const cancelStatus = current.cancelStatus || (order.status === "cancelled" && imported ? "pending" : "");
-  const fallbackImportedAt = lookupOnlyFailed ? order.updatedAt || order.createdAt || "" : "";
-  const fallbackImportRowCount = lookupOnlyFailed
-    ? (order.items || []).reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0)
-    : 0;
 
   return {
     importStatus,
-    importedAt: current.importedAt || fallbackImportedAt,
-    importError: lookupOnlyFailed ? "" : current.importError || "",
+    importedAt: missingMallbicOrderNo ? "" : current.importedAt || "",
+    importError: missingMallbicOrderNo ? "缺少墨筆克訂單號，已改回待匯入" : current.importError || "",
     importFileName: current.importFileName || "",
-    importRowCount: Number(current.importRowCount || fallbackImportRowCount || 0),
+    importRowCount: Number(current.importRowCount || 0),
     mallbicOrderNo: current.mallbicOrderNo || "",
     cancelStatus: cancelled ? "cancelled" : cancelStatus,
     cancelledAt: current.cancelledAt || "",
     cancelError: current.cancelError || ""
   };
-}
-
-function isMallbicPostImportLookupError(error) {
-  const message = String(error || "");
-  return message.includes("select.platform-select") || message.includes("平台篩選欄位");
 }
 
 function normalizeCatalog(catalog) {
@@ -1594,7 +1585,7 @@ async function runMallbicOrderSync(trigger) {
             order.mallbic.importRowCount = rowCount;
             order.mallbic.mallbicOrderNo = mallbicOrderNo;
           } else {
-            order.mallbic.importStatus = "importFailed";
+            order.mallbic.importStatus = "pending";
             order.mallbic.importError = "Mallbic order number was not found after import";
             order.mallbic.importFileName = workbook.filename;
             order.mallbic.importRowCount = expandMallbicOrderRows(order).length;
@@ -1614,7 +1605,7 @@ async function runMallbicOrderSync(trigger) {
       } catch (error) {
         const message = getErrorMessage(error);
         for (const order of importOrders) {
-          order.mallbic.importStatus = "importFailed";
+          order.mallbic.importStatus = "pending";
           order.mallbic.importError = message;
         }
         errors.push(message);
