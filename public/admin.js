@@ -243,6 +243,10 @@ function productAdminPriceLabel(product) {
 
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
+    const activeRankA = a.isActive === false ? 1 : 0;
+    const activeRankB = b.isActive === false ? 1 : 0;
+    if (activeRankA !== activeRankB) return activeRankA - activeRankB;
+
     const rankA = productStockType(a) === "preOrder" ? 0 : 1;
     const rankB = productStockType(b) === "preOrder" ? 0 : 1;
     return rankA - rankB;
@@ -367,7 +371,7 @@ function renderProductOverview(market) {
   catalogEditorEl.innerHTML = `
     <article class="market-editor" data-market-id="${market.id}">
       <div class="admin-list-actions">
-        <button type="button" class="add-product-button" data-open-new-product>? ????</button>
+        <button type="button" class="add-product-button" data-open-new-product>&#65291; &#26032;&#22686;&#21830;&#21697;</button>
       </div>
       <div class="admin-bulk-actions">
         <label class="admin-bulk-select-all">
