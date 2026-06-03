@@ -276,6 +276,15 @@ function renderProductDetail(market, product) {
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-products>回商品列表</button>
     <article class="product product-detail">
+      <div class="product-actions">
+        <strong data-price-line="${product.id}">${formatMoney(variantDisplayPrice(selected))}</strong>
+        <p class="stock-line" data-stock-line="${product.id}">${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}` : "預購不限制庫存"}</p>
+        <label class="quantity-field">
+          數量
+          <input type="number" min="1" max="${requiresStock ? (selectedStock || 1) : 999}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
+        </label>
+        <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "缺貨" : "加入購物車"}</button>
+      </div>
       <span class="product-image-wrap product-detail-image-wrap">
         <img class="product-image" src="${escapeHtml(imageUrl || market.imageUrl || placeholderImage(product.name))}" alt="${escapeHtml(product.name)}" data-product-image="${product.id}">
         <em class="stock-type-badge is-${effectiveProductStockType(product)}">${productStockLabel(product)}</em>
@@ -302,15 +311,6 @@ function renderProductDetail(market, product) {
             `;
           }).join("")}
         </div>
-      </div>
-      <div class="product-actions">
-        <strong data-price-line="${product.id}">${formatMoney(variantDisplayPrice(selected))}</strong>
-        <p class="stock-line" data-stock-line="${product.id}">${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}` : "預購不限制庫存"}</p>
-        <label class="quantity-field">
-          數量
-          <input type="number" min="1" max="${requiresStock ? (selectedStock || 1) : 999}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
-        </label>
-        <button type="button" data-add-product="${product.id}" ${disabled ? "disabled" : ""}>${disabled ? "缺貨" : "加入購物車"}</button>
       </div>
     </article>
   `;

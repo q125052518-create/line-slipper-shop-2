@@ -540,7 +540,7 @@ button.add-product-button:hover {
 }
 
 .product-detail {
-  grid-template-columns: minmax(220px, 340px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 340px) minmax(0, 1fr);
 }
 
 .product-image {
@@ -609,13 +609,29 @@ button.add-product-button:hover {
 }
 
 .product-actions {
-  align-items: end;
-  display: grid;
+  align-items: center;
+  background: #f7f4ee;
+  border: 1px solid #ded8cd;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  min-width: 96px;
+  grid-column: 1 / -1;
+  justify-content: center;
+  padding: 12px;
+}
+
+.product-actions strong {
+  font-size: 18px;
+}
+
+.product-actions .stock-line {
+  margin: 0;
 }
 
 .quantity-field {
+  align-items: center;
+  display: inline-flex;
   font-size: 13px;
   gap: 4px;
 }
@@ -1486,9 +1502,7 @@ button.admin-chat-list-item.is-selected {
   }
 
   .product-actions {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
+    justify-content: center;
   }
 
   .app-header,
