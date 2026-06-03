@@ -217,13 +217,40 @@ function renderOrderTypeMenu() {
   `;
 }
 
-function renderProductOverview(market) {
+function productTileHtml(product) {
+  const variant = firstVariant(product);
+  const imageUrl = variantImage(product, variant);
+  const isSoldOut = !productHasAvailableStock(product);
+
+  return `
+    <button type="button" class="product-tile ${isSoldOut ? "is-sold-out" : ""}" data-open-product="${product.id}">
+      <span class="product-image-wrap">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
+        <em class="stock-type-badge is-${isSoldOut ? "soldOut" : effectiveProductStockType(product)}">${isSoldOut ? "無庫存" : productStockLabel(product)}</em>
+      </span>
+      <strong>${escapeHtml(product.name)}</strong>
+    </button>
+  `;
+}
+
+function currentOverviewProducts(market) {
   const visibleProducts = state.orderType === "box"
     ? market.products.filter((product) => product.boxEnabled === true)
     : market.products;
-  const products = sortProductsForDisplay(
+  return sortProductsForDisplay(
     visibleProducts.filter((product) => productMatchesSearch(product, state.productSearchQuery))
   );
+}
+
+function renderProductOverviewGrid(market) {
+  const gridEl = productsEl.querySelector(".product-overview-grid");
+  if (!gridEl) return;
+  const products = currentOverviewProducts(market);
+  gridEl.innerHTML = products.map(productTileHtml).join("") || '<p class="empty">目前沒有可訂購商品</p>';
+}
+
+function renderProductOverview(market) {
+  const products = currentOverviewProducts(market);
   productsEl.className = "product-overview-wrap";
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
@@ -232,21 +259,7 @@ function renderProductOverview(market) {
       <input type="search" placeholder="搜尋商品名稱、品項、條碼" value="${escapeHtml(state.productSearchQuery)}" data-product-search>
     </label>
     <div class="product-overview-grid">
-      ${products.map((product) => {
-    const variant = firstVariant(product);
-    const imageUrl = variantImage(product, variant);
-    const isSoldOut = !productHasAvailableStock(product);
-
-    return `
-      <button type="button" class="product-tile ${isSoldOut ? "is-sold-out" : ""}" data-open-product="${product.id}">
-        <span class="product-image-wrap">
-          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}">
-          <em class="stock-type-badge is-${isSoldOut ? "soldOut" : effectiveProductStockType(product)}">${isSoldOut ? "無庫存" : productStockLabel(product)}</em>
-        </span>
-        <strong>${escapeHtml(product.name)}</strong>
-      </button>
-    `;
-  }).join("") || '<p class="empty">目前沒有可訂購商品</p>'}
+      ${products.map(productTileHtml).join("") || '<p class="empty">目前沒有可訂購商品</p>'}
     </div>
   `;
 }
@@ -418,15 +431,8 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("input", (event) => {
   if (!event.target.matches("[data-product-search]")) return;
-  const selectionStart = event.target.selectionStart ?? event.target.value.length;
-  const selectionEnd = event.target.selectionEnd ?? selectionStart;
   state.productSearchQuery = event.target.value;
-  renderProducts();
-  const searchInput = document.querySelector("[data-product-search]");
-  if (searchInput) {
-    searchInput.focus();
-    searchInput.setSelectionRange(selectionStart, selectionEnd);
-  }
+  renderProductOverviewGrid(currentMarket());
 });
 
 window.addEventListener("pageshow", reloadCart);
