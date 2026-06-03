@@ -24,6 +24,7 @@ const catalogFile = path.join(dataDir, "catalog.json");
 const mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
 const mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
 const mallbicOrderTemplateFile = path.join(dataDir, "mallbic-order-template.xls");
+const orderBackupsDir = path.join(dataDir, "order-backups");
 const mallbicLoginUrl = process.env.MALLBIC_LOGIN_URL || "https://ec.mallbic.com/Module/0_Login/Login.aspx?sid=g5c071iv";
 const mallbicCompanyName = process.env.MALLBIC_COMPANY_NAME || "祥瑞華有限公司";
 const mallbicDefaultTimeoutMs = Number(process.env.MALLBIC_DEFAULT_TIMEOUT_MS || 30000);
@@ -308,7 +309,21 @@ async function readOrders() {
 }
 
 async function writeOrders(orders) {
-  return writeJson(ordersFile, normalizeOrders(orders));
+  const normalizedOrders = normalizeOrders(orders);
+  const currentOrders = await readJson(ordersFile, []);
+  if (Array.isArray(currentOrders) && currentOrders.length > 0) {
+    await fs.mkdir(orderBackupsDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    await fs.writeFile(
+      path.join(orderBackupsDir, `orders-${timestamp}.json`),
+      `${JSON.stringify(currentOrders, null, 2)}\n`,
+      "utf8"
+    );
+    if (normalizedOrders.length === 0) {
+      throw new Error("拒絕把現有訂單寫成空資料，已保留備份");
+    }
+  }
+  return writeJson(ordersFile, normalizedOrders);
 }
 
 async function readBuyers() {
