@@ -118,6 +118,30 @@ function variantRow(variant = {}) {
     </div>
   `;
 }
+
+function variantBulkEditor() {
+  return `
+    <section class="variant-bulk-editor" aria-label="批次修改品項">
+      <strong>批次修改品項</strong>
+      <div class="variant-bulk-fields">
+        <label>
+          <span>價格</span>
+          <input type="number" min="0" step="1" placeholder="NT$｜價格" data-bulk-variant-price>
+        </label>
+        <label>
+          <span>庫存</span>
+          <input type="number" min="0" step="1" placeholder="商品數量" data-bulk-variant-stock>
+        </label>
+        <label>
+          <span>品項貨號前綴</span>
+          <input placeholder="例如 AZ0436" data-bulk-variant-barcode>
+        </label>
+        <button type="button" data-apply-variant-bulk>全部套用</button>
+      </div>
+    </section>
+  `;
+}
+
 function primaryMarket() {
   return catalog.markets[0] || null;
 }
@@ -349,6 +373,7 @@ function renderNewProductEditor(market) {
         </label>
         ${productStockTypeField()}
         ${productBoxEnabledField(false)}
+        ${variantBulkEditor()}
         <div class="variant-editor">
           ${variantRow()}
         </div>
@@ -393,6 +418,7 @@ function renderProductEditor(market, product) {
           <input name="name" value="${escapeHtml(product.name)}" required>
         </label>
         ${productStockTypeField(product.stockType)}
+        ${variantBulkEditor()}
         <div class="variant-editor">
           ${product.variants.map((variant) => variantRow(variant)).join("")}
         </div>
@@ -470,6 +496,24 @@ document.addEventListener("click", async (event) => {
   if (event.target.matches("[data-add-variant]")) {
     const editor = event.target.closest("form").querySelector(".variant-editor");
     editor.insertAdjacentHTML("beforeend", variantRow());
+  }
+
+  if (event.target.matches("[data-apply-variant-bulk]")) {
+    const form = event.target.closest(".product-edit-form");
+    const price = form.querySelector("[data-bulk-variant-price]").value.trim();
+    const stock = form.querySelector("[data-bulk-variant-stock]").value.trim();
+    const barcodePrefix = form.querySelector("[data-bulk-variant-barcode]").value.trim();
+    const isBoxMode = form.dataset.inventoryMode === "box";
+    const priceName = isBoxMode ? "boxPrice" : "price";
+    const stockName = isBoxMode ? "boxStock" : "stock";
+
+    form.querySelectorAll("[data-variant-row]").forEach((row, index) => {
+      if (price !== "") row.querySelector(`[name="${priceName}"]`).value = price;
+      if (stock !== "") row.querySelector(`[name="${stockName}"]`).value = stock;
+      if (barcodePrefix !== "") {
+        row.querySelector('[name="barcode"]').value = `${barcodePrefix}-${String(index + 1).padStart(2, "0")}`;
+      }
+    });
   }
 
   if (event.target.matches("[data-clear-image]")) {
