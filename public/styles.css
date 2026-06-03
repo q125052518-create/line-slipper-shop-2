@@ -267,6 +267,34 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   gap: 14px;
 }
 
+.product-search-field {
+  display: grid;
+  gap: 6px;
+  max-width: 520px;
+}
+
+.product-search-field span {
+  color: #5b665f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.product-search-field input {
+  background: #ffffff;
+  border: 1px solid #d5cec2;
+  border-radius: 6px;
+  color: #18201b;
+  font: inherit;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.product-search-field input:focus {
+  border-color: #116c5b;
+  box-shadow: 0 0 0 2px rgba(17, 108, 91, 0.12);
+  outline: none;
+}
+
 .order-type-menu {
   display: grid;
   gap: 14px;

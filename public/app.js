@@ -5,6 +5,7 @@ const state = {
   currentMarketId: "",
   currentProductId: "",
   orderType: "",
+  productSearchQuery: "",
   selectedVariants: {},
   cart: readCart(),
   buyer: null
@@ -121,6 +122,18 @@ function productHasAvailableStock(product) {
   return (product?.variants || []).some((variant) => variantDisplayStock(variant) > 0);
 }
 
+function productMatchesSearch(product, query) {
+  const keywords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (keywords.length === 0) return true;
+
+  const searchable = [
+    product.name,
+    ...(product.variants || []).flatMap((variant) => [variant.name, variant.barcode])
+  ].join(" ").toLowerCase();
+
+  return keywords.every((keyword) => searchable.includes(keyword));
+}
+
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
     const stockRankA = productHasAvailableStock(a) ? 0 : 1;
@@ -208,10 +221,16 @@ function renderProductOverview(market) {
   const visibleProducts = state.orderType === "box"
     ? market.products.filter((product) => product.boxEnabled === true)
     : market.products;
-  const products = sortProductsForDisplay(visibleProducts);
+  const products = sortProductsForDisplay(
+    visibleProducts.filter((product) => productMatchesSearch(product, state.productSearchQuery))
+  );
   productsEl.className = "product-overview-wrap";
   productsEl.innerHTML = `
     <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
+    <label class="product-search-field">
+      <span>搜尋商品</span>
+      <input type="search" placeholder="搜尋商品名稱、品項、條碼" value="${escapeHtml(state.productSearchQuery)}" data-product-search>
+    </label>
     <div class="product-overview-grid">
       ${products.map((product) => {
     const variant = firstVariant(product);
@@ -340,6 +359,7 @@ function addToCart(productId) {
 marketSelectEl?.addEventListener("change", () => {
   state.currentMarketId = marketSelectEl.value;
   state.currentProductId = "";
+  state.productSearchQuery = "";
   state.selectedVariants = {};
   renderProducts();
 });
@@ -349,6 +369,7 @@ document.addEventListener("click", (event) => {
   if (orderTypeButton) {
     state.orderType = orderTypeButton.dataset.orderType;
     state.currentProductId = "";
+    state.productSearchQuery = "";
     state.selectedVariants = {};
     renderProducts();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -358,6 +379,7 @@ document.addEventListener("click", (event) => {
   if (event.target.closest("[data-back-to-order-types]")) {
     state.orderType = "";
     state.currentProductId = "";
+    state.productSearchQuery = "";
     state.selectedVariants = {};
     renderProducts();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -392,6 +414,13 @@ document.addEventListener("click", (event) => {
 
   const productId = event.target.dataset.addProduct;
   if (productId) addToCart(productId);
+});
+
+document.addEventListener("input", (event) => {
+  if (!event.target.matches("[data-product-search]")) return;
+  state.productSearchQuery = event.target.value;
+  renderProducts();
+  document.querySelector("[data-product-search]")?.focus();
 });
 
 window.addEventListener("pageshow", reloadCart);
