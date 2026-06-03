@@ -633,8 +633,10 @@ document.addEventListener("submit", async (event) => {
       return;
     }
 
-    selectedProductId = productId;
+    selectedProductId = "";
+    isCreatingProduct = false;
     await loadCatalog();
+    alert("更改成功");
   }
 });
 
