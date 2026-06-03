@@ -453,6 +453,15 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   min-height: 188px;
 }
 
+.admin-product-price {
+  color: #9b2f2f;
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 4px;
+}
+
 .admin-product-detail-head {
   align-items: center;
   background: #ffffff;

@@ -226,6 +226,20 @@ function productStockLabel(product) {
   return productStockType(product) === "preOrder" ? "預購" : "現貨";
 }
 
+function formatMoney(value) {
+  return `NT$${Number(value || 0).toLocaleString("zh-TW")}`;
+}
+
+function productAdminPriceLabel(product) {
+  const prices = (product.variants || [])
+    .map((variant) => adminInventoryMode === "box" ? Number(variant.boxPrice ?? variant.price ?? 0) : Number(variant.price ?? 0))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+  if (prices.length === 0) return "NT$0";
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? formatMoney(min) : `${formatMoney(min)} - ${formatMoney(max)}`;
+}
+
 function sortProductsForDisplay(products) {
   return [...products].sort((a, b) => {
     const rankA = productStockType(a) === "preOrder" ? 0 : 1;
@@ -349,6 +363,7 @@ function renderProductOverview(market) {
               <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
             </span>
             <strong>${escapeHtml(product.name)}</strong>
+            <span class="admin-product-price">${escapeHtml(productAdminPriceLabel(product))}</span>
           </button>
         `).join("") || '<p class="empty">找不到符合條件的商品</p>'}
       </div>
