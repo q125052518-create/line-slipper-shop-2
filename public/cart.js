@@ -157,7 +157,7 @@ function renderCart() {
       </div>
       <div class="quantity">
         <button type="button" data-minus="${key}">-</button>
-        <span>${item.quantity}</span>
+        <input type="number" min="1" max="${item.stock}" value="${item.quantity}" data-quantity-key="${escapeHtml(key)}" aria-label="修改數量">
         <button type="button" data-plus="${key}" ${item.quantity >= item.stock ? "disabled" : ""}>+</button>
       </div>
       <button type="button" data-remove="${key}">移除</button>
@@ -189,6 +189,28 @@ function changeQuantity(key, delta) {
   renderCart();
 }
 
+function setQuantity(key, value) {
+  const item = state.cart[key];
+  if (!item) return;
+
+  const next = Math.floor(Number(value));
+  if (!Number.isFinite(next) || next <= 0) {
+    messageEl.textContent = "請輸入正確數量";
+    renderCart();
+    return;
+  }
+
+  item.quantity = Math.min(next, item.stock);
+  if (next > item.stock) {
+    messageEl.textContent = `庫存不足，目前剩 ${item.stock}`;
+  } else {
+    messageEl.textContent = "";
+  }
+
+  saveCart();
+  renderCart();
+}
+
 function updateDeliveryAddressVisibility() {
   const isShipping = deliveryMethodEl.value === "宅配";
   addressFieldEl.classList.toggle("hidden", !isShipping);
@@ -210,6 +232,18 @@ document.addEventListener("click", (event) => {
     saveCart();
     renderCart();
   }
+});
+
+document.addEventListener("change", (event) => {
+  const quantityKey = event.target.dataset.quantityKey;
+  if (!quantityKey) return;
+  setQuantity(quantityKey, event.target.value);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!event.target.matches("[data-quantity-key]") || event.key !== "Enter") return;
+  event.preventDefault();
+  event.target.blur();
 });
 
 formEl.addEventListener("submit", async (event) => {

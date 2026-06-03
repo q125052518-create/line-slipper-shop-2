@@ -680,13 +680,20 @@ button.add-product-button:hover {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: 34px 28px 34px;
+  grid-template-columns: 34px 56px 34px;
   text-align: center;
 }
 
 .quantity button {
   height: 34px;
   padding: 0;
+}
+
+.quantity input {
+  height: 34px;
+  padding: 4px 6px;
+  text-align: center;
+  width: 56px;
 }
 
 label {
