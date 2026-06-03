@@ -17,7 +17,10 @@ const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-m
 const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
 const repoDataDir = path.join(__dirname, "data");
-const requestedDataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : repoDataDir;
+const renderDiskDir = "/var/data";
+const requestedDataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : (process.env.RENDER ? renderDiskDir : repoDataDir);
 let dataDir = requestedDataDir;
 let ordersFile = path.join(dataDir, "orders.json");
 let buyersFile = path.join(dataDir, "buyers.json");
