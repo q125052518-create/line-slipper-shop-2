@@ -419,12 +419,15 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
 }
 
 .stock-type-badge.is-soldOut,
-.stock-type-inline.is-soldOut {
+.stock-type-inline.is-soldOut,
+.stock-type-badge.is-inactive,
+.stock-type-inline.is-inactive {
   background: #6d6d6d;
   color: #ffffff;
 }
 
-.box-enabled-inline {
+.box-enabled-inline,
+.inactive-inline {
   background: #295f98;
   border-radius: 4px;
   color: #ffffff;
@@ -433,6 +436,10 @@ body.orders-page:not(.buyer-logged-in) #buyerAuthPanel input {
   font-weight: 700;
   margin-left: 6px;
   padding: 5px 7px;
+}
+
+.inactive-inline {
+  background: #6d6d6d;
 }
 
 .product-tile strong {

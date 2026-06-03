@@ -477,6 +477,7 @@ function normalizeCatalog(catalog) {
     market.imageUrl = String(market.imageUrl || "").trim();
     market.products = Array.isArray(market.products) ? market.products : [];
     for (const product of market.products) {
+      product.isActive = product.isActive !== false;
       product.stockType = normalizeProductStockType(product.stockType);
       product.boxEnabled = product.boxEnabled === true;
       product.variants = Array.isArray(product.variants) ? product.variants : [];
@@ -904,6 +905,7 @@ function normalizeVariant(input, existingId) {
 function normalizeProduct(input, existingId) {
   const name = String(input.name || "").trim();
   const imageUrl = String(input.imageUrl || "").trim();
+  const isActive = input.isActive !== false;
   const stockType = normalizeProductStockType(input.stockType);
   const boxEnabled = input.boxEnabled === true;
   const variants = Array.isArray(input.variants) ? input.variants : [];
@@ -915,6 +917,7 @@ function normalizeProduct(input, existingId) {
     id: existingId || input.id || makeId("product"),
     name,
     imageUrl,
+    isActive,
     stockType,
     boxEnabled,
     variants: variants.map((variant) => normalizeVariant(variant, variant.id))
@@ -923,7 +926,7 @@ function normalizeProduct(input, existingId) {
 
 function findCatalogItem(catalog, marketId, productId, variantId) {
   const market = catalog.markets.find((entry) => entry.id === marketId && entry.isActive !== false);
-  const product = market?.products.find((entry) => entry.id === productId);
+  const product = market?.products.find((entry) => entry.id === productId && entry.isActive !== false);
   const variant = product?.variants.find((entry) => entry.id === variantId);
   return { market, product, variant };
 }
@@ -1205,7 +1208,14 @@ app.get("/api/config", (_req, res) => {
 
 app.get("/api/markets", async (_req, res) => {
   const catalog = await readCatalog();
-  res.json({ markets: catalog.markets.filter((market) => market.isActive !== false) });
+  res.json({
+    markets: catalog.markets
+      .filter((market) => market.isActive !== false)
+      .map((market) => ({
+        ...market,
+        products: (market.products || []).filter((product) => product.isActive !== false)
+      }))
+  });
 });
 
 app.get("/api/admin/catalog", async (_req, res) => {

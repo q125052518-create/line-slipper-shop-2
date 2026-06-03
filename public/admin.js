@@ -270,6 +270,15 @@ function productBoxEnabledField(checked = false) {
   `;
 }
 
+function productInactiveField(isActive = true) {
+  return `
+    <label class="toggle-field product-inactive-toggle">
+      <input type="checkbox" name="isHidden" ${isActive === false ? "checked" : ""}>
+      <span>下架</span>
+    </label>
+  `;
+}
+
 function normalizeSearchText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -361,6 +370,7 @@ function renderProductOverview(market) {
             <span class="product-image-wrap">
               <img src="${escapeHtml(productTileImage(product))}" alt="${escapeHtml(product.name)}" onerror="this.src='https://placehold.co/300x300/f2efe8/1e2720?text=No+Image';">
               <em class="stock-type-badge is-${productStockType(product)}">${productStockLabel(product)}</em>
+              ${product.isActive === false ? '<em class="stock-type-badge is-inactive">下架</em>' : ""}
             </span>
             <strong>${escapeHtml(product.name)}</strong>
             <span class="admin-product-price">${escapeHtml(productAdminPriceLabel(product))}</span>
@@ -387,6 +397,7 @@ function renderNewProductEditor(market) {
           <input name="name" placeholder="例如 雲朵厚底拖鞋" required>
         </label>
         ${productStockTypeField()}
+        ${productInactiveField(true)}
         ${productBoxEnabledField(false)}
         ${variantBulkEditor()}
         <div class="variant-editor">
@@ -419,13 +430,14 @@ function renderProductEditor(market, product) {
                 <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
                 <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
               </span>
+              ${productInactiveField(product.isActive)}
               ${productBoxEnabledField(product.boxEnabled)}
             </span>
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
           </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
-            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""}</p>
+            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.isActive === false ? '<span class="inactive-inline">下架</span>' : ""} ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""}</p>
           </div>
         </div>
         <label>
@@ -630,6 +642,7 @@ document.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         name: formData.get("name"),
         imageUrl,
+        isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
         boxEnabled: formData.get("boxEnabled") === "on",
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
@@ -680,6 +693,7 @@ document.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         name: formData.get("name"),
         imageUrl,
+        isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
         boxEnabled: formData.get("boxEnabled") === "on",
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
