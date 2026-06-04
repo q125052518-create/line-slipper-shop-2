@@ -539,6 +539,9 @@ function normalizeOrderMallbicSync(order) {
     importFileName: current.importFileName || "",
     importRowCount: Number(current.importRowCount || 0),
     mallbicOrderNo: current.mallbicOrderNo || "",
+    wholesaleQueueStatus: current.wholesaleQueueStatus || "",
+    wholesaleQueuedAt: current.wholesaleQueuedAt || "",
+    wholesaleQueueError: current.wholesaleQueueError || "",
     cancelStatus: cancelled ? "cancelled" : cancelStatus,
     cancelledAt: current.cancelledAt || "",
     cancelError: current.cancelError || ""
@@ -1589,6 +1592,13 @@ function shouldCancelOrderInMallbic(order) {
     && order.mallbic?.cancelStatus !== "cancelled";
 }
 
+function shouldQueueMallbicWholesaleOrder(order) {
+  return order.status !== "cancelled"
+    && order.mallbic?.importStatus === "imported"
+    && String(order.mallbic?.mallbicOrderNo || "").trim()
+    && order.mallbic?.wholesaleQueueStatus !== "queued";
+}
+
 function shouldUpdateOrderStatusFromMallbic(order) {
   return normalizeOrderStatus(order.status) === "pending";
 }
@@ -1717,11 +1727,13 @@ async function runMallbicOrderSync(trigger) {
     const errors = [];
     let importResult = { importedOrders: 0, importedRows: 0, sourceFile: "" };
     const cancelResults = [];
+    const wholesaleQueueResults = [];
 
     if (importOrders.length > 0) {
       try {
         const workbook = buildMallbicOrderImportWorkbook(importOrders);
         const lookupErrors = [];
+        const queueResults = {};
         const mallbicResult = await withMallbicPage(async (page) => {
           const result = await importMallbicOrdersWorkbook(page, workbook);
           const orderNumbers = {};
@@ -1729,11 +1741,22 @@ async function runMallbicOrderSync(trigger) {
             try {
               orderNumbers[order.id] = await lookupMallbicOrderNumber(page, order.id);
             } catch (error) {
-              lookupErrors.push(`${order.id} 查訂單號失敗：${getErrorMessage(error)}`);
+              lookupErrors.push(`${order.id} lookup failed: ${getErrorMessage(error)}`);
               orderNumbers[order.id] = "";
             }
+
+            if (orderNumbers[order.id]) {
+              try {
+                queueResults[order.id] = await queueMallbicWholesaleOrder(page, orderNumbers[order.id]);
+              } catch (error) {
+                const message = getErrorMessage(error);
+                queueResults[order.id] = { ok: false, mallbicOrderNo: orderNumbers[order.id], error: message };
+                lookupErrors.push(`${order.id} wholesale queue failed: ${message}`);
+                errors.push(`${order.id} wholesale queue failed: ${message}`);
+              }
+            }
           }
-          return { ...result, orderNumbers };
+          return { ...result, orderNumbers, queueResults };
         });
         const verifiedOrderNumbers = mallbicResult.orderNumbers || {};
         const verifiedOrderCount = importOrders.filter((order) => verifiedOrderNumbers[order.id]).length;
@@ -1758,6 +1781,15 @@ async function runMallbicOrderSync(trigger) {
             order.mallbic.importFileName = workbook.filename;
             order.mallbic.importRowCount = rowCount;
             order.mallbic.mallbicOrderNo = mallbicOrderNo;
+            const queueResult = queueResults[order.id];
+            if (queueResult?.ok) {
+              order.mallbic.wholesaleQueueStatus = "queued";
+              order.mallbic.wholesaleQueuedAt = importedAt;
+              order.mallbic.wholesaleQueueError = "";
+            } else if (queueResult && queueResult.ok === false) {
+              order.mallbic.wholesaleQueueStatus = "failed";
+              order.mallbic.wholesaleQueueError = queueResult.error || "Wholesale queue failed";
+            }
           } else {
             order.mallbic.importStatus = "pending";
             order.mallbic.importError = "Mallbic order number was not found after import";
@@ -1774,6 +1806,7 @@ async function runMallbicOrderSync(trigger) {
           mallbicMessage: mallbicResult.message,
           mallbicImportedCount: mallbicResult.importedCount,
           mallbicOrderNumbers: verifiedOrderNumbers,
+          queueResults,
           lookupErrors
         };
       } catch (error) {
@@ -1784,6 +1817,33 @@ async function runMallbicOrderSync(trigger) {
         }
         errors.push(message);
       }
+    }
+
+    const pendingWholesaleQueue = orders.filter(shouldQueueMallbicWholesaleOrder);
+    if (pendingWholesaleQueue.length > 0 && errors.length === 0) {
+      await withMallbicPage(async (page) => {
+        for (const order of pendingWholesaleQueue) {
+          try {
+            const mallbicOrderNo = String(order.mallbic?.mallbicOrderNo || "").trim();
+            const result = await queueMallbicWholesaleOrder(page, mallbicOrderNo);
+            order.mallbic.wholesaleQueueStatus = "queued";
+            order.mallbic.wholesaleQueuedAt = new Date().toISOString();
+            order.mallbic.wholesaleQueueError = "";
+            wholesaleQueueResults.push({ orderId: order.id, ok: true, ...result });
+          } catch (error) {
+            const message = getErrorMessage(error);
+            order.mallbic.wholesaleQueueStatus = "failed";
+            order.mallbic.wholesaleQueueError = message;
+            wholesaleQueueResults.push({
+              orderId: order.id,
+              ok: false,
+              mallbicOrderNo: order.mallbic?.mallbicOrderNo || "",
+              error: message
+            });
+            errors.push(`${order.id} wholesale queue failed: ${message}`);
+          }
+        }
+      });
     }
 
     if (cancelOrders.length > 0 && errors.length === 0) {
@@ -1811,9 +1871,14 @@ async function runMallbicOrderSync(trigger) {
     const response = {
       pendingImport: importOrders.length,
       pendingCancel: cancelOrders.length,
+      pendingWholesaleQueue: wholesaleQueueResults.length,
       importedOrders: importResult.importedOrders,
       importedRows: importResult.importedRows,
       sourceFile: importResult.sourceFile,
+      mallbicOrderNumbers: importResult.mallbicOrderNumbers || {},
+      queueResults: importResult.queueResults || {},
+      wholesaleQueueResults,
+      lookupErrors: importResult.lookupErrors || [],
       cancelledOrders: cancelResults.filter((result) => result.ok).length,
       failedCancels: cancelResults.filter((result) => !result.ok).length,
       errors
@@ -2710,6 +2775,67 @@ async function lookupMallbicOrderNumber(page, orderId) {
 async function lookupMallbicOrderInStatus(page, keyword, status) {
   await mallbicSearchOrders(page, keyword, status);
   return extractMallbicOrderNumberFromSearch(page);
+}
+
+async function queueMallbicWholesaleOrder(page, mallbicOrderNo) {
+  const keyword = String(mallbicOrderNo || "").trim();
+  if (!keyword) throw new Error("Missing Mallbic order number for wholesale queue");
+
+  await mallbicOpenOrderPage(page);
+  await mallbicClickFirst(page, [
+    "li#tpage2",
+    "li#tpage2[title*='\u65b0\u8a02\u55ae']",
+    "li.tag_selected#tpage2",
+    "li:has-text('\u65b0\u8a02\u55ae')"
+  ], "new order tab");
+  await wait(800);
+
+  await mallbicClickFirst(page, [
+    "#option",
+    "a#option[title='\u641c\u5c0b\u9078\u9805']",
+    "a#option[title*='\u641c\u5c0b']",
+    "a[title='\u641c\u5c0b\u9078\u9805']"
+  ], "search options");
+  await wait(500);
+
+  await mallbicSelectFirst(page, ["#srch_status", "select#srch_status"], "0", "new order status");
+  await mallbicFillFirst(page, [
+    "textarea[title*='\u5b8c\u5168\u7b26\u5408']",
+    "textarea[title*='\u641c\u5c0b\u591a\u7d44\u95dc\u9375\u5b57']",
+    "textarea.deactive",
+    "textarea"
+  ], keyword, "Mallbic order number");
+  await mallbicClickFirst(page, [
+    "#search",
+    "a#search[title*='\u5b8c\u5168\u7b26\u5408']",
+    "a#search[title*='\u641c\u5c0b']",
+    "a#search"
+  ], "search");
+  await wait(3000);
+
+  await mallbicClickFirst(page, [
+    "li.tool_btn.op_into_queue[title='\u7f6e\u5165\u66ab\u5b58\u5340']",
+    "li.op_into_queue",
+    "li[title='\u7f6e\u5165\u66ab\u5b58\u5340']",
+    "li:has-text('\u7f6e\u5165\u66ab\u5b58\u5340')"
+  ], "put into queue");
+  await wait(800);
+
+  await mallbicClickFirst(page, [
+    "li[dropdown-name='\u6279\u767c\u8a02\u55ae']",
+    "li:has-text('\u6279\u767c\u8a02\u55ae')"
+  ], "wholesale order");
+  await wait(800);
+
+  await mallbicClickFirst(page, [
+    "#a_confirm",
+    "span#a_confirm",
+    "span#a_confirm:has-text('\u78ba\u8a8d')",
+    "span:has-text('\u78ba\u8a8d')"
+  ], "confirm wholesale order");
+  await wait(1500);
+
+  return { ok: true, mallbicOrderNo: keyword };
 }
 
 async function cancelMallbicOrder(page, order) {
