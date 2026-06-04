@@ -557,10 +557,12 @@ function normalizeCatalog(catalog) {
       for (const variant of product.variants) {
         const price = Number(variant.price);
         const boxPrice = Number(variant.boxPrice);
+        const cost = Number(variant.cost);
         const stock = Number(variant.stock);
         const boxStock = Number(variant.boxStock);
         variant.price = Number.isFinite(price) && price >= 0 ? Math.round(price) : 0;
         variant.boxPrice = Number.isFinite(boxPrice) && boxPrice >= 0 ? Math.round(boxPrice) : variant.price;
+        variant.cost = Number.isFinite(cost) && cost >= 0 ? Math.round(cost) : 0;
         variant.stock = Number.isInteger(stock) && stock >= 0 ? stock : 0;
         variant.boxStock = Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0;
         variant.imageUrl = String(variant.imageUrl || "").trim();
@@ -572,6 +574,13 @@ function normalizeCatalog(catalog) {
 
 function normalizeProductStockType(value) {
   return value === "preOrder" ? "preOrder" : "inStock";
+}
+
+function publicProduct(product) {
+  return {
+    ...product,
+    variants: (product.variants || []).map(({ cost: _cost, ...variant }) => variant)
+  };
 }
 
 function normalizeOrderType(value) {
@@ -954,6 +963,7 @@ function normalizeVariant(input, existingId) {
   const imageUrl = String(input.imageUrl || "").trim();
   const price = Number(input.price);
   const boxPrice = Number(input.boxPrice);
+  const cost = Number(input.cost);
   const stock = Number(input.stock);
   const boxStock = Number(input.boxStock);
 
@@ -961,6 +971,7 @@ function normalizeVariant(input, existingId) {
   if (!barcode) throw new Error("請填寫品項條碼");
   if (!Number.isFinite(price) || price < 0) throw new Error("請填寫正確價格");
   if (!Number.isInteger(stock) || stock < 0) throw new Error("請填寫正確庫存");
+  if (!Number.isFinite(cost) || cost < 0) throw new Error("Invalid cost");
   if (!Number.isInteger(boxStock) || boxStock < 0) throw new Error("Invalid box stock");
 
   return {
@@ -970,6 +981,7 @@ function normalizeVariant(input, existingId) {
     imageUrl,
     price: Math.round(price),
     boxPrice: Math.round(boxPrice),
+    cost: Math.round(cost),
     stock,
     boxStock
   };
@@ -1286,7 +1298,7 @@ app.get("/api/markets", async (_req, res) => {
       .filter((market) => market.isActive !== false)
       .map((market) => ({
         ...market,
-        products: (market.products || []).filter((product) => product.isActive !== false)
+        products: (market.products || []).filter((product) => product.isActive !== false).map(publicProduct)
       }))
   });
 });

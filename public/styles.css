@@ -1170,8 +1170,8 @@ select {
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 42px minmax(220px, 1fr) 150px 96px 96px minmax(420px, 520px) 60px;
-  max-width: 1340px;
+  grid-template-columns: 42px minmax(180px, 1fr) 150px 86px 86px 86px minmax(360px, 520px) 60px;
+  max-width: 1480px;
   padding: 8px 10px;
   position: relative;
   transition: border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;

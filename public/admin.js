@@ -44,6 +44,7 @@ async function collectVariantsWithImages(container) {
       barcode: row.querySelector('[name="barcode"]').value,
       price: Number(row.querySelector('[name="price"]').value),
       boxPrice: Number(row.querySelector('[name="boxPrice"]').value),
+      cost: Number(row.querySelector('[name="cost"]').value),
       stock: Number(row.querySelector('[name="stock"]').value),
       boxStock: Number(row.querySelector('[name="boxStock"]').value),
       imageUrl: file ? await readFileAsDataUrl(file) : row.querySelector('[name="variantImageUrl"]').value
@@ -97,6 +98,10 @@ function variantRow(variant = {}) {
       <label data-stock-field="box">
         整箱售價
         <input name="boxPrice" type="number" min="0" step="1" placeholder="整箱售價" value="${escapeHtml(variant.boxPrice ?? variant.price ?? "")}" required>
+      </label>
+      <label>
+        &#25104;&#26412;
+        <input name="cost" type="number" min="0" step="1" placeholder="&#25104;&#26412;" value="${escapeHtml(variant.cost ?? 0)}" required>
       </label>
       <label data-stock-field="loose">
         散貨庫存
