@@ -43,6 +43,7 @@ const mallbicOrderAutoSyncIntervalMs = Math.max(5 * 60 * 1000, Number(process.en
 let mallbicSyncRunning = false;
 let mallbicOrderSyncRunning = false;
 let mallbicOrderStatusSyncRunning = false;
+let mallbicBrowserTaskRunning = false;
 let adminChatEventId = 0;
 const adminChatClients = new Set();
 
@@ -1680,13 +1681,19 @@ function buildMallbicOrderImportWorkbook(orders) {
 }
 
 async function withMallbicPage(task) {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage"]
-  });
+  if (mallbicBrowserTaskRunning) {
+    throw new Error("Another Mallbic browser task is already running");
+  }
+
+  mallbicBrowserTaskRunning = true;
+  let browser;
 
   try {
+    const { chromium } = await import("playwright");
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
+    });
     const context = await browser.newContext({ acceptDownloads: true, locale: "zh-TW" });
     const page = await context.newPage();
     page.setDefaultTimeout(mallbicDefaultTimeoutMs);
@@ -1702,7 +1709,8 @@ async function withMallbicPage(task) {
 
     return await task(page);
   } finally {
-    await browser.close();
+    if (browser) await browser.close().catch(() => {});
+    mallbicBrowserTaskRunning = false;
   }
 }
 
@@ -3448,7 +3456,7 @@ function startMallbicOrderAutoSync() {
     }
   };
 
-  setTimeout(runAutoSync, 30 * 1000);
+  setTimeout(runAutoSync, mallbicOrderAutoSyncIntervalMs);
   setInterval(runAutoSync, mallbicOrderAutoSyncIntervalMs);
 }
 
