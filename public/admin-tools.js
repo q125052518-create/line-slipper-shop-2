@@ -25,7 +25,7 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function renderMallbicSyncStatus(status) {
+renderMallbicSyncStatus = function renderMallbicSyncStatus(status) {
   const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
   const mode = status.enabled ? `自動同步：每 ${intervalMinutes} 分鐘` : "自動同步：未啟用";
   const running = status.running ? "目前正在同步中。" : "";
@@ -36,9 +36,9 @@ function renderMallbicSyncStatus(status) {
     : "";
   const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
   mallbicSyncStatusEl.textContent = [mode, success, finished, result, running, error].filter(Boolean).join("｜");
-}
+};
 
-function renderMallbicOrderSyncStatus(status) {
+renderMallbicOrderSyncStatus = function renderMallbicOrderSyncStatus(status) {
   const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
   const mode = status.enabled ? `自動同步：每 ${intervalMinutes} 分鐘` : "自動同步：未啟用";
   const statusIntervalMinutes = Math.round(Number(status.statusUpdateIntervalMs || status.intervalMs || 0) / 60000);
@@ -57,6 +57,55 @@ function renderMallbicOrderSyncStatus(status) {
   const statusError = status.lastStatusError ? `狀態更新錯誤：${status.lastStatusError}` : "";
   mallbicOrderSyncStatusEl.textContent = [mode, statusMode, pending, success, finished, result, statusResult, running, error, statusError].filter(Boolean).join("｜");
 }
+
+function formatMallbicDateTime(value) {
+  if (!value) return "尚未執行";
+  return new Date(value).toLocaleString("zh-TW", { hour12: false });
+}
+
+function renderMallbicSyncStatus(status) {
+  const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
+  const mode = status.enabled ? `自動同步：每 ${intervalMinutes} 分鐘` : "自動同步：未啟用";
+  const running = status.running ? "目前正在同步中" : "";
+  const success = `最後成功：${formatMallbicDateTime(status.lastSuccessAt)}`;
+  const finished = `最後完成：${formatMallbicDateTime(status.lastFinishedAt)}`;
+  const result = status.lastResult
+    ? `上次更新 ${status.lastResult.updatedCount || 0} 筆，略過預購 ${status.lastResult.skippedPreOrderCount || 0} 筆，找不到 ${status.lastResult.unmatchedCount || 0} 筆`
+    : "";
+  const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
+  mallbicSyncStatusEl.textContent = [mode, success, finished, result, running, error].filter(Boolean).join("｜");
+}
+
+function renderMallbicOrderSyncStatus(status) {
+  const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
+  const statusIntervalMinutes = Math.round(Number(status.statusUpdateIntervalMs || status.intervalMs || 0) / 60000);
+  const mode = status.enabled ? `訂單同步：每 ${intervalMinutes} 分鐘` : "訂單同步：未啟用";
+  const statusMode = status.statusUpdateAutoEnabled ? `訂單狀態更新：每 ${statusIntervalMinutes} 分鐘` : "訂單狀態更新：未啟用";
+  const pending = `待匯入 ${status.pendingImport || 0} 筆｜待取消 ${status.pendingCancel || 0} 筆｜待狀態更新 ${status.pendingStatusUpdate || 0} 筆`;
+  const running = status.running || status.statusUpdateRunning ? "目前正在同步中" : "";
+  const orderFinished = `訂單同步最後完成：${formatMallbicDateTime(status.lastFinishedAt)}`;
+  const statusFinished = `狀態更新最後完成：${formatMallbicDateTime(status.lastStatusFinishedAt)}`;
+  const result = status.lastResult
+    ? `上次訂單同步：匯入 ${status.lastResult.importedOrders || 0} 筆 / ${status.lastResult.importedRows || 0} 列，取消 ${status.lastResult.cancelledOrders || 0} 筆`
+    : "";
+  const statusResult = status.lastStatusResult
+    ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆`
+    : "";
+  const error = status.lastError ? `訂單同步錯誤：${status.lastError}` : "";
+  const statusError = status.lastStatusError ? `狀態更新錯誤：${status.lastStatusError}` : "";
+  mallbicOrderSyncStatusEl.textContent = [
+    mode,
+    statusMode,
+    pending,
+    orderFinished,
+    statusFinished,
+    result,
+    statusResult,
+    running,
+    error,
+    statusError
+  ].filter(Boolean).join("｜");
+};
 
 async function loadMallbicSyncStatus() {
   try {
