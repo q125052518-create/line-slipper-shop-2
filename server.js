@@ -2337,6 +2337,19 @@ async function mallbicClickFirst(page, selectors, label, timeout = mallbicDefaul
   return item;
 }
 
+async function mallbicCheckFirst(page, selectors, label, timeout = mallbicDefaultTimeoutMs) {
+  const item = await mallbicFindFirst(page, selectors, { visible: false });
+  if (!item) throw new Error(`Missing checkbox: ${label}`);
+
+  try {
+    await item.check({ timeout });
+  } catch {
+    await item.check({ timeout, force: true });
+  }
+
+  return item;
+}
+
 async function mallbicDismissBlockingDialogs(page) {
   const blockingTexts = ["未讀訊息", "提醒您", "警告"];
   let dismissed = false;
@@ -2710,7 +2723,7 @@ async function mallbicSelectCustomTransactionPlatform(page, { required = false }
   return true;
 }
 
-async function mallbicSearchOrders(page, keyword, status = "-1") {
+async function mallbicSearchOrders(page, keyword, status = "-1", { includeQueueTxn = false } = {}) {
   await mallbicOpenOrderPage(page);
   await mallbicCloseOpenDialogs(page);
 
@@ -2726,6 +2739,14 @@ async function mallbicSearchOrders(page, keyword, status = "-1") {
     "textarea.deactive",
     "textarea"
   ], keyword, "訂單號");
+  if (includeQueueTxn) {
+    await mallbicCheckFirst(page, [
+      "input#include-queue-txn",
+      "#include-queue-txn",
+      "input[type='checkbox'][id='include-queue-txn']"
+    ], "include queue transactions");
+    await wait(300);
+  }
   await mallbicClickFirst(page, ["#search", "a#search[title*='搜尋']", "a#search"], "搜尋");
   await wait(1500);
 
@@ -2781,7 +2802,7 @@ async function lookupMallbicOrderNumber(page, orderId) {
 }
 
 async function lookupMallbicOrderInStatus(page, keyword, status) {
-  await mallbicSearchOrders(page, keyword, status);
+  await mallbicSearchOrders(page, keyword, status, { includeQueueTxn: true });
   return extractMallbicOrderNumberFromSearch(page);
 }
 
