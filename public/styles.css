@@ -1267,12 +1267,16 @@ body.is-variant-dragging {
 .order dl {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
 .order dd {
   font-weight: 700;
   margin: 0;
+}
+
+.order-financial dd {
+  color: #c73822;
 }
 
 .note {

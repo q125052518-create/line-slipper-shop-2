@@ -614,6 +614,50 @@ function orderItemPrice(item, variant) {
   return orderItemUsesBoxStock(item) ? Number(variant.boxPrice || 0) : Number(variant.price || 0);
 }
 
+function orderItemCost(_item, variant) {
+  return Math.max(0, Math.round(Number(variant?.cost || 0)));
+}
+
+function buildCatalogCostMap(catalog) {
+  const map = new Map();
+  for (const market of catalog.markets || []) {
+    for (const product of market.products || []) {
+      for (const variant of product.variants || []) {
+        map.set(`${market.id || ""}|${product.id || ""}|${variant.id || ""}`, orderItemCost(null, variant));
+      }
+    }
+  }
+  return map;
+}
+
+function catalogCostForOrderItem(item, catalogCostMap) {
+  if (!catalogCostMap) return 0;
+  return catalogCostMap.get(`${item.marketId || ""}|${item.productId || ""}|${item.variantId || ""}`) || 0;
+}
+
+function calculateOrderFinancials(order, catalogCostMap) {
+  let profit = 0;
+  const items = (order.items || []).map((item) => {
+    const quantity = Math.max(0, Number(item.quantity || 0));
+    const price = Math.round(Number(item.price || 0));
+    const cost = Number.isFinite(Number(item.cost)) ? Math.max(0, Math.round(Number(item.cost))) : catalogCostForOrderItem(item, catalogCostMap);
+    const itemProfit = (price - cost) * quantity;
+    profit += itemProfit;
+    return {
+      ...item,
+      cost,
+      profit: itemProfit
+    };
+  });
+
+  profit = Math.round(profit);
+  return {
+    items,
+    profit,
+    availableShippingFee: Math.round(profit * 0.4)
+  };
+}
+
 function adjustOrderItemStock(item, variant, delta) {
   if (orderItemUsesBoxStock(item)) {
     variant.boxStock = Math.max(0, Number(variant.boxStock || 0) + delta);
@@ -1206,7 +1250,7 @@ function publicOrderView(order) {
     deliveryMethod: order.deliveryMethod || "",
     deliveryAddress: order.deliveryAddress || "",
     note: order.note || "",
-    items: order.items || [],
+    items: (order.items || []).map(({ cost: _cost, profit: _profit, ...item }) => item),
     totalAmount: order.totalAmount || 0,
     status: order.status || "pending",
     cancelRequest: normalizeCancelRequest(order.cancelRequest),
@@ -1214,6 +1258,16 @@ function publicOrderView(order) {
     createdAt: order.createdAt || "",
     updatedAt: order.updatedAt || "",
     cancelledAt: order.cancelledAt || ""
+  };
+}
+
+function adminOrderView(order, catalogCostMap) {
+  const financials = calculateOrderFinancials(order, catalogCostMap);
+  return {
+    ...order,
+    items: financials.items,
+    profit: financials.profit,
+    availableShippingFee: financials.availableShippingFee
   };
 }
 
@@ -3154,8 +3208,9 @@ function createProductImportTemplateBuffer() {
 }
 
 app.get("/api/orders", requireAdminApi, async (_req, res) => {
-  const orders = await readOrders();
-  res.json({ orders: orders.slice().reverse() });
+  const [orders, catalog] = await Promise.all([readOrders(), readCatalog()]);
+  const catalogCostMap = buildCatalogCostMap(catalog);
+  res.json({ orders: orders.slice().reverse().map((order) => adminOrderView(order, catalogCostMap)) });
 });
 
 app.get("/api/admin/stats", async (_req, res) => {
@@ -3287,6 +3342,7 @@ app.post("/api/orders", async (req, res) => {
       const usesBoxStock = orderItemUsesBoxStock(item);
       const availableStock = found.variant ? orderItemAvailableStock(item, found.variant) : 0;
       const price = found.variant ? orderItemPrice(item, found.variant) : 0;
+      const cost = found.variant ? orderItemCost(item, found.variant) : 0;
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
       if (usesBoxStock && found.product.boxEnabled !== true) throw new Error("Box ordering is not enabled for this product");
@@ -3310,8 +3366,10 @@ app.post("/api/orders", async (req, res) => {
         variantImageUrl: found.variant.imageUrl || found.product.imageUrl || "",
         barcode: found.variant.barcode,
         price,
+        cost,
         quantity,
-        subtotal: price * quantity
+        subtotal: price * quantity,
+        profit: (price - cost) * quantity
       };
     });
   } catch (error) {
@@ -3356,7 +3414,7 @@ app.post("/api/orders", async (req, res) => {
   orders.push(order);
   await writeOrders(orders);
 
-  res.status(201).json({ order, summary: buildOrderSummary(order) });
+  res.status(201).json({ order: publicOrderView(order), summary: buildOrderSummary(order) });
 });
 
 app.patch("/api/orders/:id/status", requireAdminApi, async (req, res) => {
