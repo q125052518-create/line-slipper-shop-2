@@ -84,7 +84,6 @@ async function loadOrders() {
           <div><dt>取貨</dt><dd>${escapeHtml(order.deliveryMethod || "-")}</dd></div>
           <div><dt>地址</dt><dd>${escapeHtml(order.deliveryAddress || "-")}</dd></div>
           <div><dt>金額</dt><dd>${formatMoney(order.totalAmount)}</dd></div>
-          <div class="order-financial"><dt>利潤</dt><dd>${formatMoney(order.profit)}</dd></div>
           <div class="order-financial"><dt>我們可出運費</dt><dd>${formatMoney(order.availableShippingFee)}</dd></div>
           <div><dt>取消申請</dt><dd>${escapeHtml(renderCancelRequest(order))}</dd></div>
           <div><dt>墨筆克匯入</dt><dd>${escapeHtml(mallbicImportLabels[order.mallbic?.importStatus] || order.mallbic?.importStatus || "待匯入")}</dd></div>
