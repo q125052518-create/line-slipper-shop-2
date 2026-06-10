@@ -54,7 +54,15 @@ async function loadBuyerStatus() {
 
 function readCart() {
   try {
-    return JSON.parse(localStorage.getItem(CART_KEY) || "{}");
+    const savedCart = JSON.parse(localStorage.getItem(CART_KEY) || "{}");
+    return Object.fromEntries(Object.entries(savedCart)
+      .filter(([key, item]) => !key.startsWith("box|") && item?.orderType !== "box" && item?.stockSource !== "box")
+      .map(([key, item]) => [key, {
+        ...item,
+        orderType: "loose",
+        orderTypeLabel: "散貨訂購",
+        stockSource: "loose"
+      }]));
   } catch {
     return {};
   }
@@ -90,15 +98,15 @@ function findCatalogItem(cartItem) {
 }
 
 function cartItemIsPreOrder(cartItem, product) {
-  return cartItem.orderType === "box" || product?.stockType === "preOrder" || cartItem.stockType === "preOrder";
+  return product?.stockType === "preOrder" || cartItem.stockType === "preOrder";
 }
 
 function cartItemAvailableStock(cartItem, variant) {
-  return cartItem.orderType === "box" ? Number(variant.boxStock || 0) : Number(variant.stock || 0);
+  return Number(variant.stock || 0);
 }
 
 function cartItemPrice(cartItem, variant) {
-  return cartItem.orderType === "box" ? Number(variant.boxPrice || 0) : Number(variant.price || 0);
+  return Number(variant.price || 0);
 }
 
 function refreshCartFromCatalog() {
@@ -106,7 +114,7 @@ function refreshCartFromCatalog() {
     const found = findCatalogItem(cartItem);
     const isPreOrder = found && cartItemIsPreOrder(cartItem, found.product);
     const availableStock = found ? cartItemAvailableStock(cartItem, found.variant) : 0;
-    if (!found || (cartItem.orderType === "box" && found.product.boxEnabled !== true) || availableStock <= 0) {
+    if (!found || cartItem.orderType === "box" || cartItem.stockSource === "box" || availableStock <= 0) {
       delete state.cart[key];
       continue;
     }
@@ -114,11 +122,11 @@ function refreshCartFromCatalog() {
     state.cart[key] = {
       ...cartItem,
       marketName: found.market.name,
-      orderType: cartItem.orderType === "box" ? "box" : "loose",
-      orderTypeLabel: cartItem.orderType === "box" ? "整箱訂購" : "散貨訂購",
+      orderType: "loose",
+      orderTypeLabel: "散貨訂購",
       stockType: isPreOrder ? "preOrder" : "inStock",
       stockTypeLabel: isPreOrder ? "預購" : "現貨",
-      stockSource: cartItem.orderType === "box" ? "box" : "loose",
+      stockSource: "loose",
       productName: found.product.name,
       variantName: found.variant.name,
       barcode: found.variant.barcode,
@@ -149,7 +157,6 @@ function renderCart() {
       <img class="cart-thumb" src="${escapeHtml(item.imageUrl || placeholderImage(item.productName))}" alt="${escapeHtml(item.variantName)}">
       <div>
         <strong>${escapeHtml(item.productName)}</strong>
-        <span>${escapeHtml(item.orderTypeLabel || (item.orderType === "box" ? "整箱訂購" : "散貨訂購"))}</span>
         <span>${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))}</span>
         <span>${escapeHtml(item.variantName)} / ${escapeHtml(item.barcode)}</span>
         <span>${escapeHtml(item.marketName)}</span>
@@ -252,9 +259,9 @@ formEl.addEventListener("submit", async (event) => {
 
   const items = Object.values(state.cart).map((item) => ({
     marketId: item.marketId,
-    orderType: item.orderType === "box" ? "box" : "loose",
+    orderType: "loose",
     stockType: item.stockType === "preOrder" ? "preOrder" : "inStock",
-    stockSource: item.orderType === "box" ? "box" : "loose",
+    stockSource: "loose",
     productId: item.productId,
     variantId: item.variantId,
     quantity: item.quantity

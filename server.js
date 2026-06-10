@@ -582,9 +582,10 @@ function normalizeProductStockType(value) {
 }
 
 function publicProduct(product) {
+  const { boxEnabled: _boxEnabled, ...publicProductData } = product;
   return {
-    ...product,
-    variants: (product.variants || []).map(({ cost: _cost, ...variant }) => variant)
+    ...publicProductData,
+    variants: (product.variants || []).map(({ cost: _cost, boxPrice: _boxPrice, boxStock: _boxStock, ...variant }) => variant)
   };
 }
 
@@ -593,7 +594,7 @@ function normalizeOrderType(value) {
 }
 
 function orderTypeLabel(value) {
-  return normalizeOrderType(value) === "box" ? "整箱訂購" : "散貨訂購";
+  return "散貨訂購";
 }
 
 function effectiveOrderItemStockType(item, product) {
@@ -1021,18 +1022,19 @@ function normalizeVariant(input, existingId) {
   if (!Number.isFinite(price) || price < 0) throw new Error("請填寫正確價格");
   if (!Number.isInteger(stock) || stock < 0) throw new Error("請填寫正確庫存");
   if (!Number.isFinite(cost) || cost < 0) throw new Error("Invalid cost");
-  if (!Number.isInteger(boxStock) || boxStock < 0) throw new Error("Invalid box stock");
+
+  const normalizedPrice = Math.round(price);
 
   return {
     id: existingId || input.id || makeId("variant"),
     name,
     barcode,
     imageUrl,
-    price: Math.round(price),
-    boxPrice: Math.round(boxPrice),
+    price: normalizedPrice,
+    boxPrice: Number.isFinite(boxPrice) && boxPrice >= 0 ? Math.round(boxPrice) : normalizedPrice,
     cost: Math.round(cost),
     stock,
-    boxStock
+    boxStock: Number.isInteger(boxStock) && boxStock >= 0 ? boxStock : 0
   };
 }
 
@@ -1041,7 +1043,7 @@ function normalizeProduct(input, existingId) {
   const imageUrl = String(input.imageUrl || "").trim();
   const isActive = input.isActive !== false;
   const stockType = normalizeProductStockType(input.stockType);
-  const boxEnabled = input.boxEnabled === true;
+  const boxEnabled = false;
   const variants = Array.isArray(input.variants) ? input.variants : [];
 
   if (!name) throw new Error("請填寫商品名稱");
@@ -1074,7 +1076,7 @@ function findCatalogItemAnyStatus(catalog, marketId, productId, variantId) {
 
 function buildOrderSummary(order) {
   const lines = order.items
-    .map((item) => `${item.orderTypeLabel || orderTypeLabel(item.orderType)} / ${item.productName} - ${item.variantName} x ${item.quantity}`)
+    .map((item) => `${item.productName} - ${item.variantName} x ${item.quantity}`)
     .join("\n");
   return `訂單已建立：${order.id}\n${lines}\n總金額：NT$${order.totalAmount}`;
 }
@@ -2146,23 +2148,23 @@ app.post("/api/admin/products/import", async (req, res) => {
         name: item.productName,
         imageUrl: item.productImageUrl,
         stockType: "inStock",
-        boxEnabled: item.boxEnabled,
+        boxEnabled: false,
         variants: []
       };
       market.products.push(product);
       createdProducts += 1;
     } else {
       product.imageUrl = item.productImageUrl || product.imageUrl || "";
-      product.boxEnabled = item.boxEnabled;
+      product.boxEnabled = false;
     }
 
     const variant = product.variants.find((entry) => entry.barcode.trim().toUpperCase() === item.barcode.toUpperCase());
     if (variant) {
       variant.name = item.variantName;
       variant.price = item.price;
-      variant.boxPrice = item.boxPrice;
+      variant.boxPrice = item.price;
       variant.stock = item.stock;
-      variant.boxStock = item.boxStock;
+      variant.boxStock = 0;
       variant.imageUrl = item.variantImageUrl || variant.imageUrl || "";
       updatedVariants += 1;
     } else {
@@ -2172,9 +2174,9 @@ app.post("/api/admin/products/import", async (req, res) => {
         barcode: item.barcode,
         imageUrl: item.variantImageUrl,
         price: item.price,
-        boxPrice: item.boxPrice,
+        boxPrice: item.price,
         stock: item.stock,
-        boxStock: item.boxStock
+        boxStock: 0
       });
       createdVariants += 1;
     }
@@ -3106,15 +3108,12 @@ function parseProductImportRows(rows) {
   const variantIndex = indexOf("\u6b3e\u5f0f");
   const barcodeIndex = indexOf("\u54c1\u9805\u689d\u78bc");
   const priceIndex = indexOfAny(["\u6563\u8ca8\u552e\u50f9", "\u552e\u50f9"]);
-  const stockIndex = indexOfAny(["\u6563\u8ca8\u5eab\u5b58", "\u6578\u91cf"]);
-  const boxPriceIndex = indexOf("\u6574\u7bb1\u552e\u50f9");
-  const boxStockIndex = indexOf("\u6574\u7bb1\u5eab\u5b58");
+  const stockIndex = indexOfAny(["\u6563\u8ca8\u5eab\u5b58", "\u5eab\u5b58", "\u6578\u91cf"]);
   const variantImageIndex = indexOf("\u54c1\u9805\u5716\u7247\u7db2\u5740");
   const activeIndex = indexOf("\u662f\u5426\u4e0a\u67b6");
-  const boxEnabledIndex = indexOf("\u6574\u7bb1\u4e0a\u67b6");
 
   if (priceIndex < 0 || stockIndex < 0) {
-    return { error: "\u627e\u4e0d\u5230\u50f9\u683c\u6216\u5eab\u5b58\u6b04\u4f4d\uff1a\u8acb\u4f7f\u7528\u6563\u8ca8\u552e\u50f9\u3001\u6563\u8ca8\u5eab\u5b58\uff08\u6216\u820a\u6b04\u4f4d\u552e\u50f9\u3001\u6578\u91cf\uff09" };
+    return { error: "\u627e\u4e0d\u5230\u50f9\u683c\u6216\u5eab\u5b58\u6b04\u4f4d\uff1a\u8acb\u4f7f\u7528\u552e\u50f9\u3001\u5eab\u5b58\uff08\u6216\u820a\u6b04\u4f4d\u6563\u8ca8\u552e\u50f9\u3001\u6563\u8ca8\u5eab\u5b58\uff09" };
   }
 
   const items = [];
@@ -3133,13 +3132,6 @@ function parseProductImportRows(rows) {
     if (!Number.isFinite(price) || price < 0) return { error: `${barcode} \u6563\u8ca8\u552e\u50f9\u683c\u5f0f\u932f\u8aa4` };
     if (!Number.isInteger(stock) || stock < 0) return { error: `${barcode} \u6563\u8ca8\u5eab\u5b58\u683c\u5f0f\u932f\u8aa4` };
 
-    const rawBoxPrice = boxPriceIndex >= 0 ? row[boxPriceIndex] : "";
-    const rawBoxStock = boxStockIndex >= 0 ? row[boxStockIndex] : "";
-    const boxPrice = rawBoxPrice === "" ? Math.round(price) : Number(rawBoxPrice);
-    const boxStock = rawBoxStock === "" ? 0 : Number(rawBoxStock);
-    if (!Number.isFinite(boxPrice) || boxPrice < 0) return { error: `${barcode} \u6574\u7bb1\u552e\u50f9\u683c\u5f0f\u932f\u8aa4` };
-    if (!Number.isInteger(boxStock) || boxStock < 0) return { error: `${barcode} \u6574\u7bb1\u5eab\u5b58\u683c\u5f0f\u932f\u8aa4` };
-
     items.push({
       marketName,
       productName,
@@ -3147,12 +3139,12 @@ function parseProductImportRows(rows) {
       variantName,
       barcode,
       price: Math.round(price),
-      boxPrice: Math.round(boxPrice),
+      boxPrice: Math.round(price),
       stock,
-      boxStock,
+      boxStock: 0,
       variantImageUrl: variantImageIndex >= 0 ? String(row[variantImageIndex] || "").trim() : "",
       isActive: activeIndex >= 0 ? parseActiveValue(row[activeIndex]) : true,
-      boxEnabled: boxEnabledIndex >= 0 ? parseActiveValue(row[boxEnabledIndex]) : true
+      boxEnabled: false
     });
   }
 
@@ -3177,13 +3169,10 @@ function createProductImportTemplateBuffer() {
     "\u5546\u54c1\u5716\u7247\u7db2\u5740",
     "\u6b3e\u5f0f",
     "\u54c1\u9805\u689d\u78bc",
-    "\u6563\u8ca8\u552e\u50f9",
-    "\u6563\u8ca8\u5eab\u5b58",
-    "\u6574\u7bb1\u552e\u50f9",
-    "\u6574\u7bb1\u5eab\u5b58",
+    "\u552e\u50f9",
+    "\u5eab\u5b58",
     "\u54c1\u9805\u5716\u7247\u7db2\u5740",
-    "\u662f\u5426\u4e0a\u67b6",
-    "\u6574\u7bb1\u4e0a\u67b6"
+    "\u662f\u5426\u4e0a\u67b6"
   ];
   const rows = [
     headers,
@@ -3193,11 +3182,8 @@ function createProductImportTemplateBuffer() {
       "AZ0402-01",
       89,
       10,
-      890,
-      2,
       "",
-      "\u662f",
-      "\u5426"
+      "\u662f"
     ]
   ];
   const workbook = XLSX.utils.book_new();
@@ -3336,16 +3322,19 @@ app.post("/api/orders", async (req, res) => {
 
   try {
     normalizedItems = items.map((item) => {
+      if (item.orderType === "box" || item.stockSource === "box") {
+        throw new Error("此訂購方式已停用，請重新加入商品後再送出訂單");
+      }
+
       const quantity = Number(item.quantity);
       const found = findCatalogItem(catalog, item.marketId, item.productId, item.variantId);
       const stockType = effectiveOrderItemStockType(item, found.product);
-      const usesBoxStock = orderItemUsesBoxStock(item);
+      const usesBoxStock = false;
       const availableStock = found.variant ? orderItemAvailableStock(item, found.variant) : 0;
       const price = found.variant ? orderItemPrice(item, found.variant) : 0;
       const cost = found.variant ? orderItemCost(item, found.variant) : 0;
 
       if (!found.market || !found.product || !found.variant) throw new Error("商品品項不存在");
-      if (usesBoxStock && found.product.boxEnabled !== true) throw new Error("Box ordering is not enabled for this product");
       if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("數量不正確");
       if ((usesBoxStock || stockType !== "preOrder") && availableStock < quantity) {
         throw new Error(`${found.product.name} - ${found.variant.name} 庫存不足，目前剩 ${availableStock}`);
@@ -3354,11 +3343,11 @@ app.post("/api/orders", async (req, res) => {
       return {
         marketId: found.market.id,
         marketName: found.market.name,
-        orderType: normalizeOrderType(item.orderType),
-        orderTypeLabel: orderTypeLabel(item.orderType),
+        orderType: "loose",
+        orderTypeLabel: orderTypeLabel("loose"),
         stockType,
         stockTypeLabel: stockType === "preOrder" ? "預購" : "現貨",
-        stockSource: usesBoxStock ? "box" : "loose",
+        stockSource: "loose",
         productId: found.product.id,
         productName: found.product.name,
         variantId: found.variant.id,

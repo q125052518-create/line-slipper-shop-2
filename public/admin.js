@@ -13,7 +13,6 @@ let dragPointerY = 0;
 let selectedProductId = "";
 let isCreatingProduct = false;
 let productSearchQuery = "";
-let adminInventoryMode = "loose";
 let selectedBulkProductIds = new Set();
 
 function escapeHtml(value) {
@@ -38,15 +37,16 @@ async function collectVariantsWithImages(container) {
   const rows = Array.from(container.querySelectorAll("[data-variant-row]"));
   return Promise.all(rows.map(async (row) => {
     const file = row.querySelector('[name="variantImageFile"]')?.files?.[0];
+    const price = Number(row.querySelector('[name="price"]').value);
     return {
       id: row.dataset.variantId || undefined,
       name: row.querySelector('[name="variantName"]').value,
       barcode: row.querySelector('[name="barcode"]').value,
-      price: Number(row.querySelector('[name="price"]').value),
-      boxPrice: Number(row.querySelector('[name="boxPrice"]').value),
+      price,
+      boxPrice: price,
       cost: Number(row.querySelector('[name="cost"]').value),
       stock: Number(row.querySelector('[name="stock"]').value),
-      boxStock: Number(row.querySelector('[name="boxStock"]').value),
+      boxStock: 0,
       imageUrl: file ? await readFileAsDataUrl(file) : row.querySelector('[name="variantImageUrl"]').value
     };
   }));
@@ -91,25 +91,17 @@ function variantRow(variant = {}) {
         品項條碼
         <input name="barcode" placeholder="例如 AA0077-01" value="${escapeHtml(variant.barcode || "")}" required>
       </label>
-      <label data-stock-field="loose">
-        散貨售價
-        <input name="price" type="number" min="0" step="1" placeholder="散貨售價" value="${escapeHtml(variant.price ?? "")}" required>
-      </label>
-      <label data-stock-field="box">
-        整箱售價
-        <input name="boxPrice" type="number" min="0" step="1" placeholder="整箱售價" value="${escapeHtml(variant.boxPrice ?? variant.price ?? "")}" required>
+      <label>
+        售價
+        <input name="price" type="number" min="0" step="1" placeholder="售價" value="${escapeHtml(variant.price ?? "")}" required>
       </label>
       <label>
         &#25104;&#26412;
         <input name="cost" type="number" min="0" step="1" placeholder="&#25104;&#26412;" value="${escapeHtml(variant.cost ?? 0)}" required>
       </label>
-      <label data-stock-field="loose">
-        散貨庫存
-        <input name="stock" type="number" min="0" step="1" placeholder="散貨庫存" value="${escapeHtml(variant.stock ?? 0)}" required>
-      </label>
-      <label data-stock-field="box">
-        整箱庫存
-        <input name="boxStock" type="number" min="0" step="1" placeholder="整箱庫存" value="${escapeHtml(variant.boxStock ?? 0)}" required>
+      <label>
+        庫存
+        <input name="stock" type="number" min="0" step="1" placeholder="庫存" value="${escapeHtml(variant.stock ?? 0)}" required>
       </label>
       <label>
         品項圖片
@@ -238,7 +230,7 @@ function formatMoney(value) {
 
 function productAdminPriceLabel(product) {
   const prices = (product.variants || [])
-    .map((variant) => adminInventoryMode === "box" ? Number(variant.boxPrice ?? variant.price ?? 0) : Number(variant.price ?? 0))
+    .map((variant) => Number(variant.price ?? 0))
     .filter((price) => Number.isFinite(price) && price >= 0);
   if (prices.length === 0) return "NT$0";
   const min = Math.min(...prices);
@@ -271,15 +263,6 @@ function productStockTypeField(value = "inStock") {
   `;
 }
 
-function productBoxEnabledField(checked = false) {
-  return `
-    <label class="toggle-field box-enabled-toggle">
-      <input type="checkbox" name="boxEnabled" ${checked ? "checked" : ""}>
-      <span>整箱上架</span>
-    </label>
-  `;
-}
-
 function productInactiveField(isActive = true) {
   return `
     <label class="toggle-field product-inactive-toggle">
@@ -298,7 +281,6 @@ function productSearchText(product) {
     product.id,
     product.name,
     productStockLabel(product),
-    product.boxEnabled ? "整箱上架" : "",
     product.barcode,
     ...(product.variants || []).flatMap((variant) => [
       variant.id,
@@ -417,7 +399,7 @@ function renderNewProductEditor(market) {
       <div class="admin-product-detail-head">
         <button type="button" class="back-button" data-back-to-admin-products>返回商品列表</button>
       </div>
-      <form id="productForm" class="product-edit-form new-product-form" data-create-product data-inventory-mode="${adminInventoryMode}">
+      <form id="productForm" class="product-edit-form new-product-form" data-create-product>
         <input type="hidden" name="marketId" value="${escapeHtml(market.id)}">
         <h2>新增商品</h2>
         <label>
@@ -426,7 +408,6 @@ function renderNewProductEditor(market) {
         </label>
         ${productStockTypeField()}
         ${productInactiveField(true)}
-        ${productBoxEnabledField(false)}
         ${variantBulkEditor()}
         <div class="variant-editor">
           ${variantRow()}
@@ -450,22 +431,17 @@ function renderProductEditor(market, product) {
           <button type="button" data-delete-product="${product.id}">刪除商品</button>
         </div>
       </div>
-      <form id="productEditForm" class="product-edit-form" data-product-id="${product.id}" data-inventory-mode="${adminInventoryMode}">
+      <form id="productEditForm" class="product-edit-form" data-product-id="${product.id}">
         <div class="product-edit-head">
           <span class="product-image-wrap">
             <span class="inventory-top-controls">
-              <span class="inventory-mode-switch" aria-label="庫存模式">
-                <button type="button" data-admin-inventory-mode="loose" class="${adminInventoryMode === "loose" ? "is-active" : ""}">散貨</button>
-                <button type="button" data-admin-inventory-mode="box" class="${adminInventoryMode === "box" ? "is-active" : ""}">整箱</button>
-              </span>
               ${productInactiveField(product.isActive)}
-              ${productBoxEnabledField(product.boxEnabled)}
             </span>
             <img src="${escapeHtml(productTileImage(product))}" alt="" onerror="this.src='https://placehold.co/120x90/f2efe8/1e2720?text=No+Image';">
           </span>
           <div>
             <h4>${escapeHtml(product.name)}</h4>
-            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.isActive === false ? '<span class="inactive-inline">下架</span>' : ""} ${product.boxEnabled ? '<span class="box-enabled-inline">整箱上架</span>' : ""}</p>
+            <p><span class="stock-type-inline is-${productStockType(product)}">${productStockLabel(product)}</span> ${product.isActive === false ? '<span class="inactive-inline">下架</span>' : ""}</p>
           </div>
         </div>
         <label>
@@ -513,18 +489,6 @@ marketFormEl?.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("click", async (event) => {
-  const inventoryModeButton = event.target.closest("[data-admin-inventory-mode]");
-  if (inventoryModeButton) {
-    adminInventoryMode = inventoryModeButton.dataset.adminInventoryMode === "box" ? "box" : "loose";
-    document.querySelectorAll(".product-edit-form").forEach((form) => {
-      form.dataset.inventoryMode = adminInventoryMode;
-    });
-    document.querySelectorAll("[data-admin-inventory-mode]").forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.adminInventoryMode === adminInventoryMode);
-    });
-    return;
-  }
-
   if (event.target.closest("[data-open-new-product]")) {
     isCreatingProduct = true;
     selectedProductId = "";
@@ -590,13 +554,10 @@ document.addEventListener("click", async (event) => {
     const price = form.querySelector("[data-bulk-variant-price]").value.trim();
     const stock = form.querySelector("[data-bulk-variant-stock]").value.trim();
     const barcodePrefix = form.querySelector("[data-bulk-variant-barcode]").value.trim();
-    const isBoxMode = form.dataset.inventoryMode === "box";
-    const priceName = isBoxMode ? "boxPrice" : "price";
-    const stockName = isBoxMode ? "boxStock" : "stock";
 
     form.querySelectorAll("[data-variant-row]").forEach((row, index) => {
-      if (price !== "") row.querySelector(`[name="${priceName}"]`).value = price;
-      if (stock !== "") row.querySelector(`[name="${stockName}"]`).value = stock;
+      if (price !== "") row.querySelector('[name="price"]').value = price;
+      if (stock !== "") row.querySelector('[name="stock"]').value = stock;
       if (barcodePrefix !== "") {
         row.querySelector('[name="barcode"]').value = `${barcodePrefix}-${String(index + 1).padStart(2, "0")}`;
       }
@@ -704,7 +665,7 @@ document.addEventListener("submit", async (event) => {
         imageUrl,
         isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
-        boxEnabled: formData.get("boxEnabled") === "on",
+        boxEnabled: false,
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
     });
@@ -755,7 +716,7 @@ document.addEventListener("submit", async (event) => {
         imageUrl,
         isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
-        boxEnabled: formData.get("boxEnabled") === "on",
+        boxEnabled: false,
         variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
       })
     });

@@ -125,7 +125,7 @@ function renderOrders(orders) {
           <div class="buyer-order-item">
             <img src="${escapeHtml(item.variantImageUrl || placeholderImage(item.productName))}" alt="${escapeHtml(item.variantName || item.productName)}">
             <div class="buyer-order-item-main">
-              <p class="buyer-order-market">${escapeHtml(item.orderTypeLabel || (item.orderType === "box" ? "整箱訂購" : "散貨訂購"))} / ${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))} / ${escapeHtml(item.marketName || "")}</p>
+              <p class="buyer-order-market">${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))} / ${escapeHtml(item.marketName || "")}</p>
               <strong>${escapeHtml(item.productName || "-")}</strong>
               <span>${escapeHtml(item.variantName || "-")} / ${escapeHtml(item.barcode || "-")}</span>
               <small>數量 ${Number(item.quantity || 0).toLocaleString("zh-TW")}</small>

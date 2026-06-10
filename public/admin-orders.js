@@ -92,7 +92,7 @@ async function loadOrders() {
         </dl>
         <ul>
           ${(order.items || []).map((item) => `
-            <li>${escapeHtml(item.orderTypeLabel || (item.orderType === "box" ? "整箱訂購" : "散貨訂購"))} / ${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))} / ${escapeHtml(item.marketName)} / ${escapeHtml(item.productName)} / ${escapeHtml(item.variantName)} / ${escapeHtml(item.barcode)} x ${item.quantity}，${formatMoney(item.subtotal)}</li>
+            <li>${escapeHtml(item.stockTypeLabel || (item.stockType === "preOrder" ? "預購" : "現貨"))} / ${escapeHtml(item.marketName)} / ${escapeHtml(item.productName)} / ${escapeHtml(item.variantName)} / ${escapeHtml(item.barcode)} x ${item.quantity}，${formatMoney(item.subtotal)}</li>
           `).join("")}
         </ul>
         ${order.note ? `<p class="note">備註：${escapeHtml(order.note)}</p>` : ""}

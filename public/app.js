@@ -4,7 +4,7 @@ const state = {
   markets: [],
   currentMarketId: "",
   currentProductId: "",
-  orderType: "",
+  orderType: "loose",
   productSearchQuery: "",
   selectedVariants: {},
   cart: readCart(),
@@ -38,7 +38,15 @@ async function loadBuyerStatus() {
 
 function readCart() {
   try {
-    return JSON.parse(localStorage.getItem(CART_KEY) || "{}");
+    const savedCart = JSON.parse(localStorage.getItem(CART_KEY) || "{}");
+    return Object.fromEntries(Object.entries(savedCart)
+      .filter(([key, item]) => !key.startsWith("box|") && item?.orderType !== "box" && item?.stockSource !== "box")
+      .map(([key, item]) => [key, {
+        ...item,
+        orderType: "loose",
+        orderTypeLabel: "散貨訂購",
+        stockSource: "loose"
+      }]));
   } catch {
     return {};
   }
@@ -98,7 +106,7 @@ function productStockType(product) {
 }
 
 function effectiveProductStockType(product) {
-  return state.orderType === "box" ? "preOrder" : productStockType(product);
+  return productStockType(product);
 }
 
 function productStockLabel(product) {
@@ -106,15 +114,15 @@ function productStockLabel(product) {
 }
 
 function variantDisplayStock(variant) {
-  return state.orderType === "box" ? Number(variant?.boxStock || 0) : Number(variant?.stock || 0);
+  return Number(variant?.stock || 0);
 }
 
 function variantDisplayPrice(variant) {
-  return state.orderType === "box" ? Number(variant?.boxPrice || 0) : Number(variant?.price || 0);
+  return Number(variant?.price || 0);
 }
 
 function productRequiresStock(product) {
-  return state.orderType === "box" || effectiveProductStockType(product) !== "preOrder";
+  return effectiveProductStockType(product) !== "preOrder";
 }
 
 function productHasAvailableStock(product) {
@@ -147,7 +155,7 @@ function sortProductsForDisplay(products) {
 }
 
 function orderTypeLabel(orderType = state.orderType) {
-  return orderType === "box" ? "整箱訂購" : "散貨訂購";
+  return "散貨訂購";
 }
 
 function showMessage(text, type = "success") {
@@ -175,17 +183,10 @@ function selectedVariant(product) {
 
 function renderProducts() {
   const market = currentMarket();
-  marketDescriptionEl.textContent = state.orderType
-    ? `${orderTypeLabel()}${market?.description ? `｜${market.description}` : ""}`
-    : "";
+  marketDescriptionEl.textContent = market?.description || "";
 
   if (!market) {
     productsEl.innerHTML = '<p class="empty">目前沒有商品資料</p>';
-    return;
-  }
-
-  if (!state.orderType) {
-    renderOrderTypeMenu();
     return;
   }
 
@@ -201,20 +202,6 @@ function renderProducts() {
   }
 
   renderProductOverview(market);
-}
-
-function renderOrderTypeMenu() {
-  productsEl.className = "order-type-menu";
-  productsEl.innerHTML = `
-    <button type="button" class="order-type-card" data-order-type="box">
-      <strong>整箱訂購</strong>
-      <span>進入商品列表</span>
-    </button>
-    <button type="button" class="order-type-card" data-order-type="loose">
-      <strong>散貨訂購</strong>
-      <span>進入商品列表</span>
-    </button>
-  `;
 }
 
 function productTileHtml(product) {
@@ -234,11 +221,8 @@ function productTileHtml(product) {
 }
 
 function currentOverviewProducts(market) {
-  const visibleProducts = state.orderType === "box"
-    ? market.products.filter((product) => product.boxEnabled === true)
-    : market.products;
   return sortProductsForDisplay(
-    visibleProducts.filter((product) => productMatchesSearch(product, state.productSearchQuery))
+    market.products.filter((product) => productMatchesSearch(product, state.productSearchQuery))
   );
 }
 
@@ -253,7 +237,6 @@ function renderProductOverview(market) {
   const products = currentOverviewProducts(market);
   productsEl.className = "product-overview-wrap";
   productsEl.innerHTML = `
-    <button type="button" class="back-button" data-back-to-order-types>返回訂購選單</button>
     <label class="product-search-field">
       <span>搜尋商品</span>
       <input type="search" placeholder="搜尋商品名稱、品項、條碼" value="${escapeHtml(state.productSearchQuery)}" data-product-search>
@@ -278,7 +261,7 @@ function renderProductDetail(market, product) {
     <article class="product product-detail">
       <div class="product-actions">
         <strong data-price-line="${product.id}">${formatMoney(variantDisplayPrice(selected))}</strong>
-        <p class="stock-line" data-stock-line="${product.id}">${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${selectedStock}` : "預購不限制庫存"}</p>
+        <p class="stock-line" data-stock-line="${product.id}">${requiresStock ? `庫存 ${selectedStock}` : "預購不限制庫存"}</p>
         <label class="quantity-field">
           數量
           <input type="number" min="1" max="${requiresStock ? (selectedStock || 1) : 999}" value="1" data-add-quantity="${product.id}" ${disabled ? "disabled" : ""}>
@@ -306,7 +289,7 @@ function renderProductDetail(market, product) {
                 <span>${escapeHtml(variant.name)}</span>
                 <small>${escapeHtml(variant.barcode)}</small>
                 <strong>${formatMoney(variantDisplayPrice(variant))}</strong>
-                <em>${requiresStock ? `${state.orderType === "box" ? "整箱庫存" : "散貨庫存"} ${variantDisplayStock(variant)}` : "預購"}</em>
+                <em>${requiresStock ? `庫存 ${variantDisplayStock(variant)}` : "預購"}</em>
               </button>
             `;
           }).join("")}
@@ -317,7 +300,7 @@ function renderProductDetail(market, product) {
 }
 
 function cartKey(marketId, productId, variantId, orderType = state.orderType) {
-  return `${orderType || "loose"}|${marketId}|${productId}|${variantId}`;
+  return `loose|${marketId}|${productId}|${variantId}`;
 }
 
 function addToCart(productId) {
@@ -329,7 +312,6 @@ function addToCart(productId) {
   const isPreOrder = effectiveProductStockType(product) === "preOrder";
   const requiresStock = productRequiresStock(product);
   const availableStock = variantDisplayStock(variant);
-  if (state.orderType === "box" && product?.boxEnabled !== true) return;
   if (!market || !product || !variant || (requiresStock && availableStock <= 0)) return;
 
   const key = cartKey(market.id, product.id, variant.id);
@@ -349,11 +331,11 @@ function addToCart(productId) {
   state.cart[key] = {
     marketId: market.id,
     marketName: market.name,
-    orderType: state.orderType || "loose",
+    orderType: "loose",
     orderTypeLabel: orderTypeLabel(),
     stockType: effectiveProductStockType(product),
     stockTypeLabel: productStockLabel(product),
-    stockSource: state.orderType === "box" ? "box" : "loose",
+    stockSource: "loose",
     productId: product.id,
     productName: product.name,
     variantId: variant.id,
@@ -378,27 +360,6 @@ marketSelectEl?.addEventListener("change", () => {
 });
 
 document.addEventListener("click", (event) => {
-  const orderTypeButton = event.target.closest("[data-order-type]");
-  if (orderTypeButton) {
-    state.orderType = orderTypeButton.dataset.orderType;
-    state.currentProductId = "";
-    state.productSearchQuery = "";
-    state.selectedVariants = {};
-    renderProducts();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
-  }
-
-  if (event.target.closest("[data-back-to-order-types]")) {
-    state.orderType = "";
-    state.currentProductId = "";
-    state.productSearchQuery = "";
-    state.selectedVariants = {};
-    renderProducts();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
-  }
-
   const openProductButton = event.target.closest("[data-open-product]");
   if (openProductButton) {
     const productId = openProductButton.dataset.openProduct;
