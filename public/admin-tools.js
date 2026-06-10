@@ -25,6 +25,12 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function cleanStatusError(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.includes("\u6574\u7bb1") ? "已移除訂購方式的歷史錯誤已隱藏" : text;
+}
+
 renderMallbicSyncStatus = function renderMallbicSyncStatus(status) {
   const intervalMinutes = Math.round(Number(status.intervalMs || 0) / 60000);
   const mode = status.enabled ? `自動同步：每 ${intervalMinutes} 分鐘` : "自動同步：未啟用";
@@ -34,7 +40,8 @@ renderMallbicSyncStatus = function renderMallbicSyncStatus(status) {
   const result = status.lastResult
     ? `上次更新 ${status.lastResult.updatedCount} 筆，跳過預購 ${status.lastResult.skippedPreOrderCount || 0} 筆，找不到 ${status.lastResult.unmatchedCount} 筆`
     : "";
-  const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
+  const errorText = cleanStatusError(status.lastError);
+  const error = errorText ? `上次錯誤：${errorText}` : "";
   mallbicSyncStatusEl.textContent = [mode, success, finished, result, running, error].filter(Boolean).join("｜");
 };
 
@@ -53,8 +60,10 @@ renderMallbicOrderSyncStatus = function renderMallbicOrderSyncStatus(status) {
   const statusResult = status.lastStatusResult
     ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆`
     : "";
-  const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
-  const statusError = status.lastStatusError ? `狀態更新錯誤：${status.lastStatusError}` : "";
+  const errorText = cleanStatusError(status.lastError);
+  const statusErrorText = cleanStatusError(status.lastStatusError);
+  const error = errorText ? `上次錯誤：${errorText}` : "";
+  const statusError = statusErrorText ? `狀態更新錯誤：${statusErrorText}` : "";
   mallbicOrderSyncStatusEl.textContent = [mode, statusMode, pending, success, finished, result, statusResult, running, error, statusError].filter(Boolean).join("｜");
 }
 
@@ -72,7 +81,8 @@ function renderMallbicSyncStatus(status) {
   const result = status.lastResult
     ? `上次更新 ${status.lastResult.updatedCount || 0} 筆，略過預購 ${status.lastResult.skippedPreOrderCount || 0} 筆，找不到 ${status.lastResult.unmatchedCount || 0} 筆`
     : "";
-  const error = status.lastError ? `上次錯誤：${status.lastError}` : "";
+  const errorText = cleanStatusError(status.lastError);
+  const error = errorText ? `上次錯誤：${errorText}` : "";
   mallbicSyncStatusEl.textContent = [mode, success, finished, result, running, error].filter(Boolean).join("｜");
 }
 
@@ -91,8 +101,10 @@ function renderMallbicOrderSyncStatus(status) {
   const statusResult = status.lastStatusResult
     ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆`
     : "";
-  const error = status.lastError ? `訂單同步錯誤：${status.lastError}` : "";
-  const statusError = status.lastStatusError ? `狀態更新錯誤：${status.lastStatusError}` : "";
+  const errorText = cleanStatusError(status.lastError);
+  const statusErrorText = cleanStatusError(status.lastStatusError);
+  const error = errorText ? `訂單同步錯誤：${errorText}` : "";
+  const statusError = statusErrorText ? `狀態更新錯誤：${statusErrorText}` : "";
   mallbicOrderSyncStatusEl.textContent = [
     mode,
     statusMode,

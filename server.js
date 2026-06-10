@@ -597,6 +597,20 @@ function orderTypeLabel(value) {
   return "散貨訂購";
 }
 
+function hideRemovedOrderTypeError(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.includes("\u6574\u7bb1") ? "已移除訂購方式的歷史錯誤已隱藏" : text;
+}
+
+function publicMallbicStatus(status) {
+  return {
+    ...status,
+    lastError: hideRemovedOrderTypeError(status.lastError),
+    lastStatusError: hideRemovedOrderTypeError(status.lastStatusError)
+  };
+}
+
 function effectiveOrderItemStockType(item, product) {
   if (normalizeOrderType(item?.orderType) === "box") return "preOrder";
   if (item?.stockType === "preOrder") return "preOrder";
@@ -1521,7 +1535,7 @@ app.post("/api/admin/mallbic/sync-inventory", async (_req, res) => {
 });
 
 app.get("/api/admin/mallbic/sync-status", async (_req, res) => {
-  res.json(await readMallbicSyncStatus());
+  res.json(publicMallbicStatus(await readMallbicSyncStatus()));
 });
 
 app.post("/api/admin/mallbic/sync-orders", async (_req, res) => {
@@ -1556,7 +1570,7 @@ app.get("/api/admin/mallbic/order-sync-status", async (_req, res) => {
   const pendingCancel = orders.filter((order) => shouldCancelOrderInMallbic(order)).length;
   const pendingStatusUpdate = orders.filter((order) => shouldUpdateOrderStatusFromMallbic(order)).length;
   res.json({
-    ...await readMallbicOrderSyncStatus(),
+    ...publicMallbicStatus(await readMallbicOrderSyncStatus()),
     pendingImport,
     pendingCancel,
     pendingStatusUpdate,
