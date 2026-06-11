@@ -35,6 +35,7 @@ const mallbicCompanyName = process.env.MALLBIC_COMPANY_NAME || "祥瑞華有限�
 const mallbicDefaultTimeoutMs = Number(process.env.MALLBIC_DEFAULT_TIMEOUT_MS || 30000);
 const mallbicNavTimeoutMs = Number(process.env.MALLBIC_NAV_TIMEOUT_MS || 60000);
 const mallbicExportTimeoutMs = Number(process.env.MALLBIC_EXPORT_TIMEOUT_MS || 600000);
+const mallbicCancelledOrderStatusLabels = ["\u5df2\u53d6\u6d88", "\u53d6\u6d88\u4ea4\u6613", "\u53d6\u6d88", "\u4f5c\u5ee2"];
 const renderBackgroundSyncEnabled = parseEnvFlag(process.env.RENDER_BACKGROUND_SYNC_ENABLED, false);
 const mallbicAutoSyncEnabled = parseEnvFlag(process.env.MALLBIC_AUTO_SYNC_ENABLED, !process.env.RENDER || renderBackgroundSyncEnabled);
 const mallbicAutoSyncIntervalMs = 10 * 60 * 1000;
@@ -526,17 +527,22 @@ function normalizeChats(chats) {
 function normalizeOrderMallbicSync(order) {
   const current = order.mallbic && typeof order.mallbic === "object" ? order.mallbic : {};
   const cancelled = current.cancelStatus === "cancelled";
-  const missingMallbicOrderNo = current.importStatus === "imported" && !String(current.mallbicOrderNo || "").trim();
-  const importStatus = missingMallbicOrderNo
-    ? (order.status === "cancelled" ? "skipped" : "pending")
+  const importedOnce = current.importedOnce === true
+    || current.importStatus === "imported"
+    || Boolean(String(current.mallbicOrderNo || "").trim())
+    || Boolean(String(current.importedAt || "").trim())
+    || (Boolean(String(current.importFileName || "").trim()) && Number(current.importRowCount || 0) > 0);
+  const importStatus = importedOnce
+    ? "imported"
     : current.importStatus || (order.status === "cancelled" ? "skipped" : "pending");
   const imported = importStatus === "imported";
   const cancelStatus = current.cancelStatus || (order.status === "cancelled" && imported ? "pending" : "");
 
   return {
     importStatus,
-    importedAt: missingMallbicOrderNo ? "" : current.importedAt || "",
-    importError: missingMallbicOrderNo ? "缺少墨筆克訂單號，已改回待匯入" : current.importError || "",
+    importedOnce,
+    importedAt: current.importedAt || "",
+    importError: current.importError || "",
     importFileName: current.importFileName || "",
     importRowCount: Number(current.importRowCount || 0),
     mallbicOrderNo: current.mallbicOrderNo || "",
@@ -1322,6 +1328,18 @@ function prepareCancelledOrder(order, actor = "buyer") {
   }
 }
 
+function prepareMallbicCancelledOrder(order, catalog, mallbicOrderNo = "") {
+  const restoredCount = restoreOrderStock(catalog, order);
+  prepareCancelledOrder(order, "mallbic");
+  order.mallbic.importStatus = "imported";
+  order.mallbic.importedOnce = true;
+  if (mallbicOrderNo) order.mallbic.mallbicOrderNo = mallbicOrderNo;
+  order.mallbic.cancelStatus = "cancelled";
+  order.mallbic.cancelledAt = new Date().toISOString();
+  order.mallbic.cancelError = "";
+  return restoredCount;
+}
+
 function requestCancelOrder(order, actor = "buyer") {
   const now = new Date().toISOString();
   order.cancelRequest = {
@@ -1654,12 +1672,12 @@ async function runMallbicInventorySync(trigger) {
 }
 
 function shouldImportOrderToMallbic(order) {
-  return order.status !== "cancelled" && order.mallbic?.importStatus !== "imported";
+  return order.status !== "cancelled" && order.mallbic?.importedOnce !== true && order.mallbic?.importStatus !== "imported";
 }
 
 function shouldCancelOrderInMallbic(order) {
   return order.status === "cancelled"
-    && order.mallbic?.importStatus === "imported"
+    && (order.mallbic?.importedOnce === true || order.mallbic?.importStatus === "imported")
     && order.mallbic?.cancelStatus !== "cancelled";
 }
 
@@ -1671,7 +1689,8 @@ function shouldQueueMallbicWholesaleOrder(order) {
 }
 
 function shouldUpdateOrderStatusFromMallbic(order) {
-  return normalizeOrderStatus(order.status) === "pending";
+  return normalizeOrderStatus(order.status) !== "cancelled"
+    && (order.mallbic?.importedOnce === true || order.mallbic?.importStatus === "imported");
 }
 
 function mallbicOrderDeliveryMethod(order) {
@@ -1837,12 +1856,8 @@ async function runMallbicOrderSync(trigger) {
           return { ...result, orderNumbers, queueResults };
         });
         const verifiedOrderNumbers = mallbicResult.orderNumbers || {};
-        const verifiedOrderCount = importOrders.filter((order) => verifiedOrderNumbers[order.id]).length;
         if (mallbicResult.importedCount !== null && mallbicResult.importedCount <= 0) {
           throw new Error("Mallbic import returned 0 imported rows");
-        }
-        if (verifiedOrderCount === 0) {
-          throw new Error("Mallbic import could not be verified because no Mallbic order number was found");
         }
         const importedAt = new Date().toISOString();
         let importedOrderCount = 0;
@@ -1854,6 +1869,7 @@ async function runMallbicOrderSync(trigger) {
             importedOrderCount += 1;
             importedRowCount += rowCount;
             order.mallbic.importStatus = "imported";
+            order.mallbic.importedOnce = true;
             order.mallbic.importedAt = importedAt;
             order.mallbic.importError = "";
             order.mallbic.importFileName = workbook.filename;
@@ -1869,12 +1885,14 @@ async function runMallbicOrderSync(trigger) {
               order.mallbic.wholesaleQueueError = queueResult.error || "Wholesale queue failed";
             }
           } else {
-            order.mallbic.importStatus = "pending";
+            order.mallbic.importStatus = "imported";
+            order.mallbic.importedOnce = true;
+            order.mallbic.importedAt = importedAt;
             order.mallbic.importError = "Mallbic order number was not found after import";
             order.mallbic.importFileName = workbook.filename;
             order.mallbic.importRowCount = expandMallbicOrderRows(order).length;
             order.mallbic.mallbicOrderNo = "";
-            errors.push(`${order.id} import was not verified in Mallbic`);
+            errors.push(`${order.id} import was not verified in Mallbic; it will not be imported again`);
           }
         }
         importResult = {
@@ -1890,7 +1908,7 @@ async function runMallbicOrderSync(trigger) {
       } catch (error) {
         const message = getErrorMessage(error);
         for (const order of importOrders) {
-          order.mallbic.importStatus = "pending";
+          order.mallbic.importStatus = order.mallbic?.importedOnce ? "imported" : "pending";
           order.mallbic.importError = message;
         }
         errors.push(message);
@@ -2006,27 +2024,52 @@ async function runMallbicOrderStatusSync(trigger) {
   try {
     const orders = await readOrders();
     const targetOrders = orders.filter((order) => shouldUpdateOrderStatusFromMallbic(order));
+    const catalog = await readCatalog();
     const checked = [];
     const updated = [];
+    const cancelled = [];
+    let restoredStockCount = 0;
 
     if (targetOrders.length > 0) {
       await withMallbicPage(async (page) => {
         for (const order of targetOrders) {
           const keyword = order.mallbic?.mallbicOrderNo || order.id;
-          const mallbicOrderNo = await lookupMallbicOrderInStatus(page, keyword, "3");
-          const found = Boolean(mallbicOrderNo);
-          checked.push({
+          const checkedItem = {
             orderId: order.id,
             keyword,
-            found,
-            mallbicOrderNo
-          });
+            found: false,
+            mallbicOrderNo: "",
+            cancelledFound: false,
+            cancelledMallbicOrderNo: ""
+          };
+
+          const cancelledMallbicOrderNo = await lookupMallbicOrderInStatusLabels(page, keyword, mallbicCancelledOrderStatusLabels);
+          checkedItem.cancelledFound = Boolean(cancelledMallbicOrderNo);
+          checkedItem.cancelledMallbicOrderNo = cancelledMallbicOrderNo;
+
+          if (cancelledMallbicOrderNo) {
+            restoredStockCount += prepareMallbicCancelledOrder(order, catalog, cancelledMallbicOrderNo);
+            cancelled.push(order.id);
+            checked.push(checkedItem);
+            continue;
+          }
+
+          if (normalizeOrderStatus(order.status) !== "pending") {
+            checked.push(checkedItem);
+            continue;
+          }
+
+          const mallbicOrderNo = await lookupMallbicOrderInStatus(page, keyword, "3");
+          const found = Boolean(mallbicOrderNo);
+          checkedItem.found = found;
+          checkedItem.mallbicOrderNo = mallbicOrderNo;
 
           if (found) {
             order.status = "processing";
             order.updatedAt = new Date().toISOString();
             order.mallbic = normalizeOrderMallbicSync(order);
             order.mallbic.importStatus = "imported";
+            order.mallbic.importedOnce = true;
             order.mallbic.importedAt = order.mallbic.importedAt || order.updatedAt;
             order.mallbic.importError = "";
             order.mallbic.importRowCount = order.mallbic.importRowCount || expandMallbicOrderRows(order).length;
@@ -2035,18 +2078,24 @@ async function runMallbicOrderStatusSync(trigger) {
             }
             updated.push(order.id);
           }
+
+          checked.push(checkedItem);
         }
       });
     }
 
+    if (cancelled.length > 0 && restoredStockCount > 0) await writeCatalog(catalog);
     await writeOrders(orders);
     const finishedAt = new Date().toISOString();
     const response = {
       pendingStatusUpdate: targetOrders.length,
       checkedOrders: checked.length,
       updatedOrders: updated.length,
-      unchangedOrders: checked.filter((item) => !item.found).length,
+      cancelledOrders: cancelled.length,
+      restoredStockCount,
+      unchangedOrders: checked.filter((item) => !item.found && !item.cancelledFound).length,
       updated,
+      cancelled,
       checked
     };
 
@@ -2876,6 +2925,36 @@ async function lookupMallbicOrderInStatus(page, keyword, status) {
   return extractMallbicOrderNumberFromSearch(page);
 }
 
+async function resolveMallbicOrderStatusValue(page, labels) {
+  await mallbicOpenOrderPage(page);
+  await mallbicCloseOpenDialogs(page);
+
+  if (!await mallbicFindFirst(page, ["#srch_status", "select#srch_status"])) {
+    await mallbicClickFirst(page, ["#option", "a#option[title*='\u641c\u5c0b']", "a#option"], "\u641c\u5c0b\u9078\u9805");
+    await wait(500);
+  }
+
+  const statusSelect = await mallbicFindFirst(page, ["#srch_status", "select#srch_status"], { visible: false });
+  if (!statusSelect) return "";
+
+  return statusSelect.evaluate((select, targetLabels) => {
+    const cleanLabels = targetLabels.map((label) => String(label || "").trim()).filter(Boolean);
+    const options = Array.from(select.options || []);
+    const match = options.find((option) => {
+      const text = String(option.textContent || "").trim();
+      const value = String(option.value || "").trim();
+      return cleanLabels.some((label) => text.includes(label) || value === label);
+    });
+    return match ? String(match.value || "").trim() : "";
+  }, labels);
+}
+
+async function lookupMallbicOrderInStatusLabels(page, keyword, labels) {
+  const statusValue = await resolveMallbicOrderStatusValue(page, labels);
+  if (!statusValue) return "";
+  return lookupMallbicOrderInStatus(page, keyword, statusValue);
+}
+
 async function queueMallbicWholesaleOrder(page, mallbicOrderNo) {
   const keyword = String(mallbicOrderNo || "").trim();
   if (!keyword) throw new Error("Missing Mallbic order number for wholesale queue");
@@ -3401,6 +3480,7 @@ app.post("/api/orders", async (req, res) => {
     status: "pending",
     mallbic: {
       importStatus: "pending",
+      importedOnce: false,
       importedAt: "",
       importError: "",
       importFileName: "",
@@ -3532,7 +3612,7 @@ function startMallbicOrderAutoSync() {
 
     try {
       const result = await runMallbicOrderStatusSync("auto");
-      console.log(`Mallbic order status sync finished. Checked ${result.checkedOrders} orders, updated ${result.updatedOrders} orders.`);
+      console.log(`Mallbic order status sync finished. Checked ${result.checkedOrders} orders, updated ${result.updatedOrders} orders, cancelled ${result.cancelledOrders || 0} orders.`);
     } catch (error) {
       console.error("Mallbic order status sync failed:", error);
     }

@@ -58,7 +58,7 @@ renderMallbicOrderSyncStatus = function renderMallbicOrderSyncStatus(status) {
     ? `上次匯入 ${status.lastResult.importedOrders || 0} 筆訂單 / ${status.lastResult.importedRows || 0} 列，取消 ${status.lastResult.cancelledOrders || 0} 筆`
     : "";
   const statusResult = status.lastStatusResult
-    ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆`
+    ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆，墨筆克取消 ${status.lastStatusResult.cancelledOrders || 0} 筆`
     : "";
   const errorText = cleanStatusError(status.lastError);
   const statusErrorText = cleanStatusError(status.lastStatusError);
@@ -99,7 +99,7 @@ function renderMallbicOrderSyncStatus(status) {
     ? `上次訂單同步：匯入 ${status.lastResult.importedOrders || 0} 筆 / ${status.lastResult.importedRows || 0} 列，取消 ${status.lastResult.cancelledOrders || 0} 筆`
     : "";
   const statusResult = status.lastStatusResult
-    ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆`
+    ? `上次狀態更新：檢查 ${status.lastStatusResult.checkedOrders || 0} 筆，改成處理中 ${status.lastStatusResult.updatedOrders || 0} 筆，墨筆克取消 ${status.lastStatusResult.cancelledOrders || 0} 筆`
     : "";
   const errorText = cleanStatusError(status.lastError);
   const statusErrorText = cleanStatusError(status.lastStatusError);
