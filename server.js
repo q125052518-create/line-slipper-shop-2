@@ -14,6 +14,10 @@ const port = Number(process.env.PORT || 3000);
 const adminAccount = process.env.ADMIN_ACCOUNT || "admin";
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
 const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-me";
+const haxxAdminToolId = process.env.HAXX_ADMIN_TOOL_ID || "rt_line_slipper_shop_2_admin";
+const haxxLaunchVerifyBaseUrl = (process.env.HAXX_LAUNCH_VERIFY_BASE_URL || "https://haxx.tail779f0b.ts.net").replace(/\/+$/, "");
+const haxxLaunchSecret = process.env.HAXX_LAUNCH_SECRET || "";
+const haxxLaunchMaxAgeSeconds = Math.max(60, Number(process.env.HAXX_LAUNCH_MAX_AGE_SECONDS || 300));
 const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
 const repoDataDir = path.join(__dirname, "data");
@@ -130,6 +134,21 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.get("/api/auth/status", (req, res) => {
   res.json({ authenticated: isAdminAuthenticated(req) });
+});
+
+app.get("/auth/haxx", async (req, res) => {
+  const verified = await verifyHaxxLaunch(req);
+  if (!verified.ok) {
+    return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
+  }
+
+  const sessionToken = createSessionToken({
+    source: "haxx",
+    haxxUsername: verified.username,
+    haxxDisplayName: verified.displayName
+  });
+  res.setHeader("Set-Cookie", buildSessionCookie(req, sessionToken));
+  res.redirect(safeAdminRedirectPath(req.query.next));
 });
 
 app.post("/api/buyer/register", async (req, res) => {
@@ -895,6 +914,102 @@ function getErrorMessage(error) {
 function parseEnvFlag(value, fallback = false) {
   if (value === undefined || value === null || value === "") return fallback;
   return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
+}
+
+function getSingleQueryValue(value) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return String(raw || "").trim();
+}
+
+function safeAdminRedirectPath(value) {
+  const target = getSingleQueryValue(value) || "/admin.html";
+  if (!target.startsWith("/") || target.startsWith("//")) return "/admin.html";
+  if (!target.startsWith("/admin")) return "/admin.html";
+  return target;
+}
+
+function compareHaxxSignature(actual, expected) {
+  const actualBuffer = Buffer.from(String(actual || ""));
+  const expectedBuffer = Buffer.from(String(expected || ""));
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function expectedHaxxLaunchSignature(username, displayName, issuedAt) {
+  const payload = [haxxAdminToolId, username, displayName, String(issuedAt)].join("\n");
+  return crypto.createHmac("sha256", haxxLaunchSecret).update(payload).digest("hex");
+}
+
+function readHaxxLaunchQuery(req) {
+  return {
+    username: getSingleQueryValue(req.query.haxx_username),
+    displayName: getSingleQueryValue(req.query.haxx_display_name),
+    issuedAtText: getSingleQueryValue(req.query.haxx_issued_at),
+    signature: getSingleQueryValue(req.query.haxx_sig)
+  };
+}
+
+function validateHaxxLaunchBasics(params) {
+  if (!params.username || !params.issuedAtText || !params.signature) {
+    return { ok: false, error: "missing_launch_token" };
+  }
+  const issuedAt = Number(params.issuedAtText);
+  if (!Number.isInteger(issuedAt)) {
+    return { ok: false, error: "invalid_launch_token" };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (now - issuedAt > haxxLaunchMaxAgeSeconds || issuedAt - now > 60) {
+    return { ok: false, error: "expired_launch_token" };
+  }
+  return { ok: true, issuedAt };
+}
+
+async function verifyHaxxLaunchWithRemote(params) {
+  const verifyUrl = new URL(
+    `/api/tools/${encodeURIComponent(haxxAdminToolId)}/launch/verify`,
+    `${haxxLaunchVerifyBaseUrl}/`
+  );
+  verifyUrl.searchParams.set("haxx_username", params.username);
+  verifyUrl.searchParams.set("haxx_display_name", params.displayName);
+  verifyUrl.searchParams.set("haxx_issued_at", params.issuedAtText);
+  verifyUrl.searchParams.set("haxx_sig", params.signature);
+
+  const response = await fetch(verifyUrl, { headers: { Accept: "application/json" } });
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+  if (!response.ok || !data.ok) {
+    return { ok: false, error: data.error || `verify_http_${response.status}` };
+  }
+  return {
+    ok: true,
+    username: String(data.username || params.username),
+    displayName: String(data.display_name || params.displayName)
+  };
+}
+
+async function verifyHaxxLaunch(req) {
+  const params = readHaxxLaunchQuery(req);
+  const basic = validateHaxxLaunchBasics(params);
+  if (!basic.ok) return basic;
+
+  if (haxxLaunchSecret) {
+    const expected = expectedHaxxLaunchSignature(params.username, params.displayName, basic.issuedAt);
+    if (!compareHaxxSignature(params.signature, expected)) {
+      return { ok: false, error: "invalid_launch_token" };
+    }
+    return { ok: true, username: params.username, displayName: params.displayName };
+  }
+
+  try {
+    return await verifyHaxxLaunchWithRemote(params);
+  } catch (error) {
+    console.error("HAXX launch verify failed", error);
+    return { ok: false, error: "verify_unavailable" };
+  }
 }
 
 function parseCookies(req) {
