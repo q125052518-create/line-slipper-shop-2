@@ -2187,22 +2187,50 @@ app.post("/api/admin/products/import", async (req, res) => {
   let createdProducts = 0;
   let createdVariants = 0;
   let updatedVariants = 0;
-  let primaryMarket = catalog.markets[0];
+  const marketByName = new Map(
+    catalog.markets
+      .map((market) => [normalizeMarketLookupName(market.name), market])
+      .filter(([name]) => name)
+  );
 
-  for (const item of parsed.items) {
-    if (!primaryMarket) {
-      primaryMarket = {
-        id: makeId("market"),
-        name: item.marketName || "\u9810\u8a2d\u8ce3\u5834",
-        description: "",
-        isActive: true,
-        products: []
-      };
-      catalog.markets.push(primaryMarket);
-      createdMarkets += 1;
+  function resolveImportMarket(item) {
+    const requestedName = String(item.marketName || "").trim();
+    if (requestedName) {
+      const key = normalizeMarketLookupName(requestedName);
+      let market = marketByName.get(key);
+      if (!market) {
+        market = {
+          id: makeId("market"),
+          name: requestedName,
+          description: "",
+          isActive: true,
+          products: []
+        };
+        catalog.markets.push(market);
+        marketByName.set(key, market);
+        createdMarkets += 1;
+      }
+      return market;
     }
 
-    const market = primaryMarket;
+    if (catalog.markets[0]) return catalog.markets[0];
+
+    const fallbackName = "預設賣場";
+    const market = {
+      id: makeId("market"),
+      name: fallbackName,
+      description: "",
+      isActive: true,
+      products: []
+    };
+    catalog.markets.push(market);
+    marketByName.set(normalizeMarketLookupName(fallbackName), market);
+    createdMarkets += 1;
+    return market;
+  }
+
+  for (const item of parsed.items) {
+    const market = resolveImportMarket(item);
     market.isActive = true;
     let product = market.products.find((entry) => entry.name.trim() === item.productName);
     if (!product) {
@@ -2294,6 +2322,10 @@ function normalizeHeader(value) {
 
 function normalizeBarcode(value) {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function normalizeMarketLookupName(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function findHeaderIndex(headers, aliases) {
@@ -3195,7 +3227,7 @@ function parseProductImportRows(rows) {
   const headers = rows[headerIndex].map((cell) => String(cell).trim());
   const indexOf = (name) => headers.indexOf(name);
   const indexOfAny = (names) => names.map(indexOf).find((entry) => entry >= 0) ?? -1;
-  const marketIndex = indexOf("\u8ce3\u5834\u540d\u7a31");
+  const marketIndex = indexOfAny(["賣場", "\u8ce3\u5834\u540d\u7a31", "商店名稱", "店鋪名稱", "店名"]);
   const productIndex = indexOf("\u5546\u54c1\u540d\u7a31");
   const productImageIndex = indexOf("\u5546\u54c1\u5716\u7247\u7db2\u5740");
   const variantIndex = indexOf("\u6b3e\u5f0f");
@@ -3260,6 +3292,7 @@ function productNameFromBarcode(barcode) {
 function createProductImportTemplateBuffer() {
   const headers = [
     "\u5546\u54c1\u5716\u7247\u7db2\u5740",
+    "賣場",
     "\u6b3e\u5f0f",
     "\u54c1\u9805\u689d\u78bc",
     "\u552e\u50f9",
@@ -3271,6 +3304,7 @@ function createProductImportTemplateBuffer() {
     headers,
     [
       "",
+      "夏季拖鞋賣場",
       "\u6a59\u8272 / M(40-41) \u9577\u5ea6\u7d04 26cm",
       "AZ0402-01",
       89,
