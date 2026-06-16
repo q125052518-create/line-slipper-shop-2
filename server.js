@@ -142,12 +142,7 @@ app.get("/auth/haxx", async (req, res) => {
     return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
   }
 
-  const sessionToken = createSessionToken({
-    source: "haxx",
-    haxxUsername: verified.username,
-    haxxDisplayName: verified.displayName
-  });
-  res.setHeader("Set-Cookie", buildSessionCookie(req, sessionToken));
+  setHaxxAdminSessionCookie(req, res, verified);
   res.redirect(safeAdminRedirectPath(req.query.next));
 });
 
@@ -949,6 +944,11 @@ function readHaxxLaunchQuery(req) {
   };
 }
 
+function hasHaxxLaunchQuery(req) {
+  const params = readHaxxLaunchQuery(req);
+  return Boolean(params.username || params.displayName || params.issuedAtText || params.signature);
+}
+
 function validateHaxxLaunchBasics(params) {
   if (!params.username || !params.issuedAtText || !params.signature) {
     return { ok: false, error: "missing_launch_token" };
@@ -1010,6 +1010,15 @@ async function verifyHaxxLaunch(req) {
     console.error("HAXX launch verify failed", error);
     return { ok: false, error: "verify_unavailable" };
   }
+}
+
+function setHaxxAdminSessionCookie(req, res, verified) {
+  const sessionToken = createSessionToken({
+    source: "haxx",
+    haxxUsername: verified.username,
+    haxxDisplayName: verified.displayName
+  });
+  res.setHeader("Set-Cookie", buildSessionCookie(req, sessionToken));
 }
 
 function parseCookies(req) {
@@ -1091,8 +1100,21 @@ function buildBuyerSessionCookie(req, value, maxAge = 60 * 60 * 24 * 30) {
   return buildNamedSessionCookie(req, "buyer_session", value, maxAge);
 }
 
-function requireAdminPage(req, res, next) {
+async function requireAdminPage(req, res, next) {
   if (isAdminAuthenticated(req)) return next();
+  if (hasHaxxLaunchQuery(req)) {
+    try {
+      const verified = await verifyHaxxLaunch(req);
+      if (!verified.ok) {
+        return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
+      }
+      setHaxxAdminSessionCookie(req, res, verified);
+      return next();
+    } catch (error) {
+      console.error("HAXX admin page login failed", error);
+      return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
+    }
+  }
   res.redirect("/login.html");
 }
 
