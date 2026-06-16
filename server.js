@@ -3228,7 +3228,7 @@ function parseProductImportRows(rows) {
   const indexOf = (name) => headers.indexOf(name);
   const indexOfAny = (names) => names.map(indexOf).find((entry) => entry >= 0) ?? -1;
   const marketIndex = indexOfAny(["賣場", "\u8ce3\u5834\u540d\u7a31", "商店名稱", "店鋪名稱", "店名"]);
-  const productIndex = indexOf("\u5546\u54c1\u540d\u7a31");
+  const productIndex = indexOfAny(["商品賣場", "\u5546\u54c1\u540d\u7a31", "商品", "product_name"]);
   const productImageIndex = indexOf("\u5546\u54c1\u5716\u7247\u7db2\u5740");
   const variantIndex = indexOf("\u6b3e\u5f0f");
   const barcodeIndex = indexOf("\u54c1\u9805\u689d\u78bc");
@@ -3292,7 +3292,7 @@ function productNameFromBarcode(barcode) {
 function createProductImportTemplateBuffer() {
   const headers = [
     "\u5546\u54c1\u5716\u7247\u7db2\u5740",
-    "賣場",
+    "商品賣場",
     "\u6b3e\u5f0f",
     "\u54c1\u9805\u689d\u78bc",
     "\u552e\u50f9",
@@ -3304,7 +3304,7 @@ function createProductImportTemplateBuffer() {
     headers,
     [
       "",
-      "夏季拖鞋賣場",
+      "AZ0409",
       "\u6a59\u8272 / M(40-41) \u9577\u5ea6\u7d04 26cm",
       "AZ0402-01",
       89,
