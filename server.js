@@ -34,6 +34,15 @@ let mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
 let mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
 const mallbicOrderTemplateFile = path.join(repoDataDir, "mallbic-order-template.xls");
 let orderBackupsDir = path.join(dataDir, "order-backups");
+let uploadsDir = path.join(dataDir, "uploads");
+let imageUploadsDir = path.join(uploadsDir, "images");
+const allowedImageUploadTypes = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["image/gif", "gif"]
+]);
+const imageUploadMaxBytes = Number(process.env.IMAGE_UPLOAD_MAX_BYTES || 12 * 1024 * 1024);
 const mallbicLoginUrl = process.env.MALLBIC_LOGIN_URL || "https://ec.mallbic.com/Module/0_Login/Login.aspx?sid=g5c071iv";
 const mallbicCompanyName = process.env.MALLBIC_COMPANY_NAME || "祥瑞華有限公司";
 const mallbicDefaultTimeoutMs = Number(process.env.MALLBIC_DEFAULT_TIMEOUT_MS || 30000);
@@ -295,6 +304,7 @@ app.get("/product-import-template.xlsx", (_req, res) => {
   res.send(buffer);
 });
 
+app.use("/uploads", express.static(uploadsDir, { maxAge: "30d" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 async function ensureStore() {
@@ -311,8 +321,11 @@ async function ensureStore() {
     mallbicSyncFile = path.join(dataDir, "mallbic-sync.json");
     mallbicOrderSyncFile = path.join(dataDir, "mallbic-order-sync.json");
     orderBackupsDir = path.join(dataDir, "order-backups");
+    uploadsDir = path.join(dataDir, "uploads");
+    imageUploadsDir = path.join(uploadsDir, "images");
     await fs.mkdir(dataDir, { recursive: true });
   }
+  await fs.mkdir(imageUploadsDir, { recursive: true });
   await ensureJsonFile(ordersFile, []);
   await ensureJsonFile(buyersFile, []);
   await ensureJsonFile(chatsFile, []);
@@ -1550,6 +1563,31 @@ app.get("/api/admin/storage-status", async (_req, res) => {
     productCount: catalog.markets.reduce((sum, market) => sum + (market.products || []).length, 0)
   });
 });
+
+app.post(
+  "/api/admin/images",
+  express.raw({ type: "image/*", limit: imageUploadMaxBytes }),
+  async (req, res) => {
+    const contentType = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    const extension = allowedImageUploadTypes.get(contentType);
+    if (!extension) {
+      return res.status(415).json({ message: "只支援 JPG、PNG、WEBP、GIF 圖片" });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ message: "請選擇圖片檔案" });
+    }
+
+    await fs.mkdir(imageUploadsDir, { recursive: true });
+    const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
+    const filePath = path.join(imageUploadsDir, fileName);
+    await fs.writeFile(filePath, req.body);
+    res.status(201).json({
+      imageUrl: `/uploads/images/${fileName}`,
+      size: req.body.length,
+      contentType
+    });
+  }
+);
 
 app.post("/api/admin/markets", async (req, res) => {
   const catalog = await readCatalog();

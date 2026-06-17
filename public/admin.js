@@ -33,6 +33,63 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("圖片壓縮失敗"));
+    }, type, quality);
+  });
+}
+
+async function loadImageForResize(file) {
+  if ("createImageBitmap" in window) return createImageBitmap(file);
+
+  const dataUrl = await readFileAsDataUrl(file);
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("圖片讀取失敗"));
+    image.src = dataUrl;
+  });
+}
+
+async function prepareImageForUpload(file) {
+  if (!file.type.startsWith("image/")) throw new Error("請選擇圖片檔案");
+  if (file.type === "image/gif") return file;
+
+  const image = await loadImageForResize(file);
+  const width = image.width;
+  const height = image.height;
+  if (!width || !height) return file;
+
+  const maxSide = 1800;
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  if (typeof image.close === "function") image.close();
+
+  const blob = await canvasToBlob(canvas, "image/jpeg", 0.86);
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+}
+
+async function uploadImageFile(file) {
+  const prepared = await prepareImageForUpload(file);
+  const response = await fetch("/api/admin/images", {
+    method: "POST",
+    headers: { "Content-Type": prepared.type || "application/octet-stream" },
+    body: prepared
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "圖片上傳失敗");
+  return data.imageUrl || "";
+}
+
 async function collectVariantsWithImages(container) {
   const rows = Array.from(container.querySelectorAll("[data-variant-row]"));
   return Promise.all(rows.map(async (row) => {
@@ -47,20 +104,20 @@ async function collectVariantsWithImages(container) {
       cost: Number(row.querySelector('[name="cost"]').value),
       stock: Number(row.querySelector('[name="stock"]').value),
       boxStock: 0,
-      imageUrl: file ? await readFileAsDataUrl(file) : row.querySelector('[name="variantImageUrl"]').value
+      imageUrl: file ? await uploadImageFile(file) : row.querySelector('[name="variantImageUrl"]').value
     };
   }));
 }
 
 async function productImageFromForm(form, formData) {
   const file = form.elements.imageFile?.files?.[0];
-  if (file) return readFileAsDataUrl(file);
+  if (file) return uploadImageFile(file);
   return formData.get("imageUrl") || "";
 }
 
 async function marketImageFromForm(form, formData) {
   const file = form.elements.imageFile?.files?.[0];
-  if (file) return readFileAsDataUrl(file);
+  if (file) return uploadImageFile(file);
   return formData.get("imageUrl") || "";
 }
 
@@ -655,7 +712,15 @@ document.addEventListener("submit", async (event) => {
       alert("尚未建立資料，無法新增商品");
       return;
     }
-    const imageUrl = await productImageFromForm(event.target, formData);
+    let imageUrl = "";
+    let variants = [];
+    try {
+      imageUrl = await productImageFromForm(event.target, formData);
+      variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+    } catch (error) {
+      alert(error.message || "圖片上傳失敗");
+      return;
+    }
 
     const response = await fetch(`/api/admin/markets/${marketId}/products`, {
       method: "POST",
@@ -666,7 +731,7 @@ document.addEventListener("submit", async (event) => {
         isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
         boxEnabled: false,
-        variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
+        variants
       })
     });
 
@@ -686,7 +751,13 @@ document.addEventListener("submit", async (event) => {
     event.preventDefault();
     const marketId = event.target.closest("[data-market-id]").dataset.marketId;
     const formData = new FormData(event.target);
-    const imageUrl = await marketImageFromForm(event.target, formData);
+    let imageUrl = "";
+    try {
+      imageUrl = await marketImageFromForm(event.target, formData);
+    } catch (error) {
+      alert(error.message || "圖片上傳失敗");
+      return;
+    }
 
     await fetch(`/api/admin/markets/${marketId}`, {
       method: "PUT",
@@ -706,7 +777,15 @@ document.addEventListener("submit", async (event) => {
     event.preventDefault();
     const productId = event.target.dataset.productId;
     const formData = new FormData(event.target);
-    const imageUrl = await productImageFromForm(event.target, formData);
+    let imageUrl = "";
+    let variants = [];
+    try {
+      imageUrl = await productImageFromForm(event.target, formData);
+      variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+    } catch (error) {
+      alert(error.message || "圖片上傳失敗");
+      return;
+    }
 
     const response = await fetch(`/api/admin/products/${productId}`, {
       method: "PUT",
@@ -717,7 +796,7 @@ document.addEventListener("submit", async (event) => {
         isActive: formData.get("isHidden") !== "on",
         stockType: formData.get("stockType"),
         boxEnabled: false,
-        variants: await collectVariantsWithImages(event.target.querySelector(".variant-editor"))
+        variants
       })
     });
 
@@ -765,10 +844,9 @@ document.addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const uploader = event.target.closest(".image-uploader");
-  const dataUrl = await readFileAsDataUrl(file);
-  uploader.querySelector('input[type="hidden"]').value = dataUrl;
+  const previewUrl = URL.createObjectURL(file);
   uploader.querySelector("[data-image-preview]").outerHTML =
-    `<span class="image-preview" data-image-preview><img src="${dataUrl}" alt=""></span>`;
+    `<span class="image-preview" data-image-preview><img src="${previewUrl}" alt="" onload="URL.revokeObjectURL(this.src)"></span>`;
 });
 
 refreshCatalogEl.addEventListener("click", () => {
