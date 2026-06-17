@@ -58,10 +58,19 @@ async function prepareImageForUpload(file) {
   if (!file.type.startsWith("image/")) throw new Error("請選擇圖片檔案");
   if (file.type === "image/gif") return file;
 
-  const image = await loadImageForResize(file);
+  let image;
+  try {
+    image = await loadImageForResize(file);
+  } catch {
+    return file;
+  }
+
   const width = image.width;
   const height = image.height;
-  if (!width || !height) return file;
+  if (!width || !height) {
+    if (typeof image.close === "function") image.close();
+    return file;
+  }
 
   const maxSide = 1800;
   const scale = Math.min(1, maxSide / Math.max(width, height));
@@ -69,13 +78,21 @@ async function prepareImageForUpload(file) {
   canvas.width = Math.max(1, Math.round(width * scale));
   canvas.height = Math.max(1, Math.round(height * scale));
   const context = canvas.getContext("2d");
+  if (!context) {
+    if (typeof image.close === "function") image.close();
+    return file;
+  }
   context.fillStyle = "#fff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   if (typeof image.close === "function") image.close();
 
-  const blob = await canvasToBlob(canvas, "image/jpeg", 0.86);
-  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+  try {
+    const blob = await canvasToBlob(canvas, "image/jpeg", 0.86);
+    return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
 }
 
 async function uploadImageFile(file) {
@@ -88,6 +105,44 @@ async function uploadImageFile(file) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "圖片上傳失敗");
   return data.imageUrl || "";
+}
+
+function formSubmitControls(form) {
+  const controls = Array.from(form.querySelectorAll("button, input[type='submit']"));
+  if (form.id) {
+    document.querySelectorAll("[form]").forEach((control) => {
+      if (control.getAttribute("form") === form.id) controls.push(control);
+    });
+  }
+  return [...new Set(controls)];
+}
+
+function beginFormSubmit(form, label) {
+  if (form.dataset.submitting === "1") return null;
+  form.dataset.submitting = "1";
+
+  const controls = formSubmitControls(form).map((control) => ({
+    control,
+    disabled: control.disabled,
+    text: control.tagName === "BUTTON" ? control.textContent : ""
+  }));
+
+  for (const item of controls) {
+    item.control.disabled = true;
+    if (item.control.tagName === "BUTTON" && item.control.type === "submit") {
+      item.control.textContent = label;
+    }
+  }
+
+  return () => {
+    delete form.dataset.submitting;
+    for (const item of controls) {
+      item.control.disabled = item.disabled;
+      if (item.control.tagName === "BUTTON" && item.text) {
+        item.control.textContent = item.text;
+      }
+    }
+  };
 }
 
 async function collectVariantsWithImages(container) {
@@ -525,24 +580,37 @@ async function loadCatalog() {
 
 marketFormEl?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const finishSubmit = beginFormSubmit(marketFormEl, "新增中...");
+  if (!finishSubmit) return;
+
   const formData = new FormData(marketFormEl);
-  const imageUrl = await marketImageFromForm(marketFormEl, formData);
+  try {
+    const imageUrl = await marketImageFromForm(marketFormEl, formData);
+    const response = await fetch("/api/admin/markets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: formData.get("name"),
+        imageUrl,
+        description: formData.get("description"),
+        isActive: formData.get("isActive") === "on"
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.message || "新增賣場失敗");
+      return;
+    }
 
-  await fetch("/api/admin/markets", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: formData.get("name"),
-      imageUrl,
-      description: formData.get("description"),
-      isActive: formData.get("isActive") === "on"
-    })
-  });
-
-  marketFormEl.reset();
-  resetImageUploaders(marketFormEl);
-  marketFormEl.elements.isActive.checked = true;
-  await loadCatalog();
+    marketFormEl.reset();
+    resetImageUploaders(marketFormEl);
+    marketFormEl.elements.isActive.checked = true;
+    await loadCatalog();
+  } catch (error) {
+    alert(error.message || "新增賣場失敗");
+  } finally {
+    finishSubmit();
+  }
 });
 
 document.addEventListener("click", async (event) => {
@@ -706,44 +774,46 @@ document.addEventListener("wheel", (event) => {
 document.addEventListener("submit", async (event) => {
   if (event.target.matches("[data-create-product]")) {
     event.preventDefault();
+    const finishSubmit = beginFormSubmit(event.target, "新增中...");
+    if (!finishSubmit) return;
+
     const formData = new FormData(event.target);
     const marketId = formData.get("marketId") || primaryMarket()?.id;
-    if (!marketId) {
-      alert("尚未建立資料，無法新增商品");
-      return;
-    }
-    let imageUrl = "";
-    let variants = [];
     try {
-      imageUrl = await productImageFromForm(event.target, formData);
-      variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+      if (!marketId) {
+        alert("尚未建立資料，無法新增商品");
+        return;
+      }
+      const imageUrl = await productImageFromForm(event.target, formData);
+      const variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+
+      const response = await fetch(`/api/admin/markets/${marketId}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.get("name"),
+          imageUrl,
+          isActive: formData.get("isHidden") !== "on",
+          stockType: formData.get("stockType"),
+          boxEnabled: false,
+          variants
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(data.message || "新增商品失敗");
+        return;
+      }
+
+      isCreatingProduct = false;
+      selectedProductId = data.product?.id || "";
+      await loadCatalog();
     } catch (error) {
-      alert(error.message || "圖片上傳失敗");
-      return;
+      alert(error.message || "新增商品失敗");
+    } finally {
+      finishSubmit();
     }
-
-    const response = await fetch(`/api/admin/markets/${marketId}/products`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: formData.get("name"),
-        imageUrl,
-        isActive: formData.get("isHidden") !== "on",
-        stockType: formData.get("stockType"),
-        boxEnabled: false,
-        variants
-      })
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      alert(data.message || "新增商品失敗");
-      return;
-    }
-
-    isCreatingProduct = false;
-    selectedProductId = data.product?.id || "";
-    await loadCatalog();
     return;
   }
 
@@ -775,41 +845,43 @@ document.addEventListener("submit", async (event) => {
 
   if (event.target.matches(".product-edit-form")) {
     event.preventDefault();
+    const finishSubmit = beginFormSubmit(event.target, "儲存中...");
+    if (!finishSubmit) return;
+
     const productId = event.target.dataset.productId;
     const formData = new FormData(event.target);
-    let imageUrl = "";
-    let variants = [];
     try {
-      imageUrl = await productImageFromForm(event.target, formData);
-      variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+      const imageUrl = await productImageFromForm(event.target, formData);
+      const variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.get("name"),
+          imageUrl,
+          isActive: formData.get("isHidden") !== "on",
+          stockType: formData.get("stockType"),
+          boxEnabled: false,
+          variants
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        alert(data.message || "儲存商品失敗");
+        return;
+      }
+
+      selectedProductId = "";
+      isCreatingProduct = false;
+      await loadCatalog();
+      alert("更改成功");
     } catch (error) {
-      alert(error.message || "圖片上傳失敗");
-      return;
+      alert(error.message || "儲存商品失敗");
+    } finally {
+      finishSubmit();
     }
-
-    const response = await fetch(`/api/admin/products/${productId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: formData.get("name"),
-        imageUrl,
-        isActive: formData.get("isHidden") !== "on",
-        stockType: formData.get("stockType"),
-        boxEnabled: false,
-        variants
-      })
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      alert(data.message || "儲存商品失敗");
-      return;
-    }
-
-    selectedProductId = "";
-    isCreatingProduct = false;
-    await loadCatalog();
-    alert("更改成功");
   }
 });
 
