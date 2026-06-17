@@ -588,6 +588,9 @@ function normalizeCatalog(catalog) {
     market.imageUrl = String(market.imageUrl || "").trim();
     market.products = Array.isArray(market.products) ? market.products : [];
     for (const product of market.products) {
+      const clientRequestId = normalizeClientRequestId(product._clientRequestId || product.clientRequestId);
+      if (clientRequestId) product._clientRequestId = clientRequestId;
+      else delete product._clientRequestId;
       product.isActive = product.isActive !== false;
       product.stockType = normalizeProductStockType(product.stockType);
       product.boxEnabled = product.boxEnabled === true;
@@ -614,8 +617,12 @@ function normalizeProductStockType(value) {
   return value === "preOrder" ? "preOrder" : "inStock";
 }
 
+function normalizeClientRequestId(value) {
+  return String(value || "").trim().replace(/[^a-zA-Z0-9._:-]/g, "").slice(0, 120);
+}
+
 function publicProduct(product) {
-  const { boxEnabled: _boxEnabled, ...publicProductData } = product;
+  const { boxEnabled: _boxEnabled, _clientRequestId, ...publicProductData } = product;
   return {
     ...publicProductData,
     variants: (product.variants || []).map(({ cost: _cost, boxPrice: _boxPrice, boxStock: _boxStock, ...variant }) => variant)
@@ -1215,6 +1222,7 @@ function normalizeProduct(input, existingId) {
   const stockType = normalizeProductStockType(input.stockType);
   const boxEnabled = false;
   const variants = Array.isArray(input.variants) ? input.variants : [];
+  const clientRequestId = normalizeClientRequestId(input._clientRequestId || input.clientRequestId);
 
   if (!name) throw new Error("請填寫商品名稱");
   if (variants.length === 0) throw new Error("請至少建立一個品項");
@@ -1226,6 +1234,7 @@ function normalizeProduct(input, existingId) {
     isActive,
     stockType,
     boxEnabled,
+    _clientRequestId: clientRequestId || undefined,
     variants: variants.map((variant) => normalizeVariant(variant, variant.id))
   };
 }
@@ -1637,6 +1646,12 @@ app.post("/api/admin/markets/:marketId/products", async (req, res) => {
   if (!market) return res.status(404).json({ message: "找不到賣場" });
 
   try {
+    const clientRequestId = normalizeClientRequestId(req.body?._clientRequestId || req.body?.clientRequestId);
+    const existingProduct = clientRequestId
+      ? market.products.find((product) => product._clientRequestId === clientRequestId)
+      : null;
+    if (existingProduct) return res.json({ product: existingProduct, duplicate: true });
+
     const product = normalizeProduct(req.body);
     market.products.push(product);
     await writeCatalog(catalog);

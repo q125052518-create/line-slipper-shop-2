@@ -481,6 +481,38 @@ async function fetchCatalogWithRetry(maxAttempts = 4) {
   throw lastError;
 }
 
+function createClientRequestId(prefix) {
+  const randomId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${randomId}`;
+}
+
+function isTransientStatus(status) {
+  return [502, 503, 504].includes(status);
+}
+
+async function postJsonWithRetry(url, payload, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok || !isTransientStatus(response.status) || attempt === maxAttempts) {
+        return { response, data };
+      }
+      lastError = new Error(data.message || `暫時無法新增商品 (${response.status})`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw error;
+    }
+    await wait(900 * attempt);
+  }
+  throw lastError;
+}
+
 function renderProductOverview(market) {
   const products = filteredProducts(market);
   updateProductSearchCount(products.length, market.products.length);
@@ -816,26 +848,25 @@ document.addEventListener("submit", async (event) => {
       }
       const imageUrl = await productImageFromForm(event.target, formData);
       const variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
+      const clientRequestId = event.target.dataset.createRequestId || createClientRequestId("product");
+      event.target.dataset.createRequestId = clientRequestId;
 
-      const response = await fetch(`/api/admin/markets/${marketId}/products`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.get("name"),
-          imageUrl,
-          isActive: formData.get("isHidden") !== "on",
-          stockType: formData.get("stockType"),
-          boxEnabled: false,
-          variants
-        })
+      const { response, data } = await postJsonWithRetry(`/api/admin/markets/${marketId}/products`, {
+        name: formData.get("name"),
+        imageUrl,
+        isActive: formData.get("isHidden") !== "on",
+        stockType: formData.get("stockType"),
+        boxEnabled: false,
+        clientRequestId,
+        variants
       });
 
-      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         alert(data.message || "新增商品失敗");
         return;
       }
 
+      delete event.target.dataset.createRequestId;
       isCreatingProduct = false;
       selectedProductId = data.product?.id || "";
       await loadCatalog();
