@@ -459,6 +459,28 @@ function renderCatalog() {
   renderProductEditor(market, product);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchCatalogWithRetry(maxAttempts = 4) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`/api/admin/catalog?t=${Date.now()}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || `商品資料讀取失敗 (${response.status})`);
+      }
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) await wait(700 * attempt);
+    }
+  }
+  throw lastError;
+}
+
 function renderProductOverview(market) {
   const products = filteredProducts(market);
   updateProductSearchCount(products.length, market.products.length);
@@ -572,10 +594,18 @@ function renderProductEditor(market, product) {
 }
 
 async function loadCatalog() {
-  catalog = await fetch("/api/admin/catalog").then((response) => response.json());
-  const productIds = new Set((catalog.markets || []).flatMap((market) => (market.products || []).map((product) => product.id)));
-  selectedBulkProductIds = new Set([...selectedBulkProductIds].filter((id) => productIds.has(id)));
-  renderCatalog();
+  try {
+    catalog = await fetchCatalogWithRetry();
+    const productIds = new Set((catalog.markets || []).flatMap((market) => (market.products || []).map((product) => product.id)));
+    selectedBulkProductIds = new Set([...selectedBulkProductIds].filter((id) => productIds.has(id)));
+    renderCatalog();
+  } catch (error) {
+    catalogEditorEl.innerHTML = `
+      <p class="empty">
+        ${escapeHtml(error.message || "商品資料讀取失敗")}，請按「重新整理」再試。
+      </p>
+    `;
+  }
 }
 
 marketFormEl?.addEventListener("submit", async (event) => {
