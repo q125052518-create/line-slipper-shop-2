@@ -155,6 +155,11 @@ app.get("/auth/haxx", async (req, res) => {
   res.redirect(safeAdminRedirectPath(req.query.next));
 });
 
+app.get("/auth/haxx/start", (req, res) => {
+  res.setHeader("Set-Cookie", buildHaxxAdminNextCookie(req, safeAdminRedirectPath(req.query.next), 5 * 60));
+  res.redirect(haxxAdminOpenUrl());
+});
+
 app.post("/api/buyer/register", async (req, res) => {
   const parsed = validateBuyerInput(req.body || {}, { requireName: true });
   if (parsed.error) return res.status(400).json({ message: parsed.error });
@@ -943,6 +948,14 @@ function safeAdminRedirectPath(value) {
   return target;
 }
 
+function requestedAdminPath(req) {
+  return safeAdminRedirectPath(req.originalUrl || req.url || "/admin.html");
+}
+
+function haxxAdminOpenUrl() {
+  return new URL(`/tools/${encodeURIComponent(haxxAdminToolId)}/open`, `${haxxLaunchVerifyBaseUrl}/`).toString();
+}
+
 function compareHaxxSignature(actual, expected) {
   const actualBuffer = Buffer.from(String(actual || ""));
   const expectedBuffer = Buffer.from(String(expected || ""));
@@ -1032,13 +1045,13 @@ async function verifyHaxxLaunch(req) {
   }
 }
 
-function setHaxxAdminSessionCookie(req, res, verified) {
+function setHaxxAdminSessionCookie(req, res, verified, extraCookies = []) {
   const sessionToken = createSessionToken({
     source: "haxx",
     haxxUsername: verified.username,
     haxxDisplayName: verified.displayName
   });
-  res.setHeader("Set-Cookie", buildSessionCookie(req, sessionToken));
+  res.setHeader("Set-Cookie", [buildSessionCookie(req, sessionToken), ...extraCookies]);
 }
 
 function parseCookies(req) {
@@ -1116,6 +1129,10 @@ function buildSessionCookie(req, value, maxAge = 60 * 60 * 24) {
   return buildNamedSessionCookie(req, "admin_session", value, maxAge);
 }
 
+function buildHaxxAdminNextCookie(req, value, maxAge = 5 * 60) {
+  return buildNamedSessionCookie(req, "haxx_admin_next", value, maxAge);
+}
+
 function buildBuyerSessionCookie(req, value, maxAge = 60 * 60 * 24 * 30) {
   return buildNamedSessionCookie(req, "buyer_session", value, maxAge);
 }
@@ -1128,14 +1145,16 @@ async function requireAdminPage(req, res, next) {
       if (!verified.ok) {
         return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
       }
-      setHaxxAdminSessionCookie(req, res, verified);
-      return next();
+      const nextPath = safeAdminRedirectPath(parseCookies(req).haxx_admin_next || req.query.next);
+      setHaxxAdminSessionCookie(req, res, verified, [buildHaxxAdminNextCookie(req, "", 0)]);
+      return res.redirect(nextPath);
     } catch (error) {
       console.error("HAXX admin page login failed", error);
       return res.status(401).send("HAXX 登入驗證失敗，請從 HAXX 首頁重新開啟。");
     }
   }
-  res.redirect("/login.html");
+  res.setHeader("Set-Cookie", buildHaxxAdminNextCookie(req, requestedAdminPath(req), 5 * 60));
+  res.redirect(haxxAdminOpenUrl());
 }
 
 function requireAdminApi(req, res, next) {
