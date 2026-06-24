@@ -49,10 +49,13 @@ const mallbicDefaultTimeoutMs = Number(process.env.MALLBIC_DEFAULT_TIMEOUT_MS ||
 const mallbicNavTimeoutMs = Number(process.env.MALLBIC_NAV_TIMEOUT_MS || 60000);
 const mallbicExportTimeoutMs = Number(process.env.MALLBIC_EXPORT_TIMEOUT_MS || 600000);
 const mallbicCancelledOrderStatusLabels = ["\u5df2\u53d6\u6d88", "\u53d6\u6d88\u4ea4\u6613", "\u53d6\u6d88", "\u4f5c\u5ee2"];
+const runningOnRender = parseEnvFlag(process.env.RENDER, false);
 const renderBackgroundSyncEnabled = parseEnvFlag(process.env.RENDER_BACKGROUND_SYNC_ENABLED, false);
-const mallbicAutoSyncEnabled = parseEnvFlag(process.env.MALLBIC_AUTO_SYNC_ENABLED, !process.env.RENDER || renderBackgroundSyncEnabled);
+const mallbicAutoSyncEnabled = (!runningOnRender || renderBackgroundSyncEnabled)
+  && parseEnvFlag(process.env.MALLBIC_AUTO_SYNC_ENABLED, !runningOnRender || renderBackgroundSyncEnabled);
 const mallbicAutoSyncIntervalMs = 10 * 60 * 1000;
-const mallbicOrderAutoSyncEnabled = parseEnvFlag(process.env.MALLBIC_ORDER_AUTO_SYNC_ENABLED, !process.env.RENDER || renderBackgroundSyncEnabled);
+const mallbicOrderAutoSyncEnabled = (!runningOnRender || renderBackgroundSyncEnabled)
+  && parseEnvFlag(process.env.MALLBIC_ORDER_AUTO_SYNC_ENABLED, !runningOnRender || renderBackgroundSyncEnabled);
 const mallbicOrderAutoSyncIntervalMs = Math.max(5 * 60 * 1000, Number(process.env.MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS || 5 * 60 * 1000));
 let mallbicSyncRunning = false;
 let mallbicOrderSyncRunning = false;

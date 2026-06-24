@@ -25,6 +25,8 @@ services:
         sync: false
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
+      - key: RENDER_BACKGROUND_SYNC_ENABLED
+        value: "false"
       - key: MALLBIC_ACCOUNT
         sync: false
       - key: MALLBIC_PASSWORD
@@ -32,10 +34,10 @@ services:
       - key: MALLBIC_COMPANY_NAME
         value: ???????
       - key: MALLBIC_AUTO_SYNC_ENABLED
-        value: "true"
+        value: "false"
       - key: MALLBIC_AUTO_SYNC_INTERVAL_MS
         value: "600000"
       - key: MALLBIC_ORDER_AUTO_SYNC_ENABLED
-        value: "true"
+        value: "false"
       - key: MALLBIC_ORDER_AUTO_SYNC_INTERVAL_MS
         value: "300000"
