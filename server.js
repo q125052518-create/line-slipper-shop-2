@@ -912,8 +912,83 @@ function buildAdminStats(orders, catalog) {
   };
 }
 
+function parseEmbeddedImageDataUrl(value) {
+  const match = String(value || "").trim().match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([a-z0-9+/=\s]+)$/i);
+  if (!match) return null;
+
+  const contentType = match[1].toLowerCase();
+  const extension = allowedImageUploadTypes.get(contentType);
+  if (!extension) return null;
+
+  const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
+  if (!buffer.length || buffer.length > imageUploadMaxBytes) {
+    return { error: "unsupported-size", byteLength: buffer.length };
+  }
+
+  return { contentType, extension, buffer, byteLength: buffer.length };
+}
+
+async function persistEmbeddedImageDataUrl(value, cache, result) {
+  const parsed = parseEmbeddedImageDataUrl(value);
+  if (!parsed) return value;
+  if (parsed.error) {
+    result.skippedCount += 1;
+    result.skippedBytes += parsed.byteLength || 0;
+    return value;
+  }
+
+  const hash = crypto.createHash("sha256").update(parsed.buffer).digest("hex");
+  if (cache.has(hash)) {
+    result.convertedCount += 1;
+    return cache.get(hash);
+  }
+
+  await fs.mkdir(imageUploadsDir, { recursive: true });
+  const fileName = `embedded-${hash.slice(0, 24)}.${parsed.extension}`;
+  const filePath = path.join(imageUploadsDir, fileName);
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, parsed.buffer);
+    result.writtenCount += 1;
+    result.writtenBytes += parsed.byteLength;
+  }
+
+  const imageUrl = `/uploads/images/${fileName}`;
+  cache.set(hash, imageUrl);
+  result.convertedCount += 1;
+  result.convertedBytes += parsed.byteLength;
+  return imageUrl;
+}
+
+async function compactCatalogEmbeddedImages(catalog) {
+  const result = {
+    convertedCount: 0,
+    writtenCount: 0,
+    skippedCount: 0,
+    convertedBytes: 0,
+    writtenBytes: 0,
+    skippedBytes: 0
+  };
+  const cache = new Map();
+
+  for (const market of catalog.markets || []) {
+    market.imageUrl = await persistEmbeddedImageDataUrl(market.imageUrl, cache, result);
+    for (const product of market.products || []) {
+      product.imageUrl = await persistEmbeddedImageDataUrl(product.imageUrl, cache, result);
+      for (const variant of product.variants || []) {
+        variant.imageUrl = await persistEmbeddedImageDataUrl(variant.imageUrl, cache, result);
+      }
+    }
+  }
+
+  return result;
+}
+
 async function writeCatalog(catalog) {
-  return writeJson(catalogFile, normalizeCatalog(catalog));
+  const normalizedCatalog = normalizeCatalog(catalog);
+  await compactCatalogEmbeddedImages(normalizedCatalog);
+  return writeJson(catalogFile, normalizedCatalog);
 }
 
 async function readMallbicSyncStatus() {
@@ -1635,6 +1710,15 @@ app.get("/api/admin/storage-status", async (_req, res) => {
     orderCount: orders.length,
     productCount: catalog.markets.reduce((sum, market) => sum + (market.products || []).length, 0)
   });
+});
+
+app.post("/api/admin/catalog/compact-images", async (_req, res) => {
+  const catalog = await readCatalog();
+  const result = await compactCatalogEmbeddedImages(catalog);
+  if (result.convertedCount > 0) {
+    await writeJson(catalogFile, normalizeCatalog(catalog));
+  }
+  res.json(result);
 });
 
 app.post(
