@@ -9,6 +9,14 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const adminAccount = process.env.ADMIN_ACCOUNT || "admin";
@@ -121,6 +129,17 @@ const defaultCatalog = {
     }
   ]
 };
+
+app.get("/healthz", (_req, res) => {
+  res.json({
+    ok: true,
+    uptimeSeconds: Math.round(process.uptime()),
+    render: runningOnRender,
+    renderBackgroundSyncEnabled,
+    mallbicAutoSyncEnabled,
+    mallbicOrderAutoSyncEnabled
+  });
+});
 
 app.use(express.json({
   limit: "15mb",
@@ -1982,6 +2001,10 @@ function buildMallbicOrderImportWorkbook(orders) {
 }
 
 async function withMallbicPage(task) {
+  if (runningOnRender && !renderBackgroundSyncEnabled) {
+    throw new Error("Mallbic browser tasks are disabled on Render; run them from the local HAXX tools instead.");
+  }
+
   if (mallbicBrowserTaskRunning) {
     throw new Error("Another Mallbic browser task is already running");
   }

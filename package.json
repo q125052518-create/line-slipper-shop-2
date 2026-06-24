@@ -2,6 +2,9 @@
   "name": "line-liff-order-system",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "type": "module",
   "scripts": {
     "dev": "node server.js",

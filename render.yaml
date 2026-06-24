@@ -2,8 +2,9 @@ services:
   - type: web
     name: line-slipper-shop-2
     runtime: node
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
+    healthCheckPath: /healthz
     disks:
       - name: line-slipper-shop-2-data
         mountPath: /var/data
@@ -25,6 +26,8 @@ services:
         sync: false
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
       - key: RENDER_BACKGROUND_SYNC_ENABLED
         value: "false"
       - key: MALLBIC_ACCOUNT
