@@ -4,7 +4,6 @@ services:
     runtime: node
     buildCommand: npm ci --omit=dev
     startCommand: npm start
-    healthCheckPath: /healthz
     disks:
       - name: line-slipper-shop-2-data
         mountPath: /var/data
