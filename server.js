@@ -72,6 +72,29 @@ let mallbicBrowserTaskRunning = false;
 let adminChatEventId = 0;
 const adminChatClients = new Set();
 
+function wrapAsyncHandler(handler) {
+  if (typeof handler !== "function" || handler.length >= 4) return handler;
+  return function wrappedAsyncHandler(req, res, next) {
+    try {
+      return Promise.resolve(handler(req, res, next)).catch(next);
+    } catch (error) {
+      return next(error);
+    }
+  };
+}
+
+function wrapExpressAsyncRoutes(expressApp) {
+  for (const method of ["get", "post", "put", "patch", "delete", "use"]) {
+    const original = expressApp[method].bind(expressApp);
+    expressApp[method] = (...args) => original(...args.map((arg) => {
+      if (Array.isArray(arg)) return arg.map((item) => wrapAsyncHandler(item));
+      return wrapAsyncHandler(arg);
+    }));
+  }
+}
+
+wrapExpressAsyncRoutes(app);
+
 const defaultMallbicSyncStatus = {
   enabled: mallbicAutoSyncEnabled,
   intervalMs: mallbicAutoSyncIntervalMs,
@@ -3890,6 +3913,12 @@ function startMallbicOrderAutoSync() {
   setTimeout(runAutoSync, mallbicOrderAutoSyncIntervalMs);
   setInterval(runAutoSync, mallbicOrderAutoSyncIntervalMs);
 }
+
+app.use((error, req, res, next) => {
+  console.error(`Unhandled request error ${req.method} ${req.originalUrl}:`, error);
+  if (res.headersSent) return next(error);
+  res.status(500).json({ message: "伺服器發生錯誤，請稍後再試" });
+});
 
 app.listen(port, () => {
   console.log(`LINE slipper order system running at http://localhost:${port}`);

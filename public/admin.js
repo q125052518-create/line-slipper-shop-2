@@ -97,12 +97,11 @@ async function prepareImageForUpload(file) {
 
 async function uploadImageFile(file) {
   const prepared = await prepareImageForUpload(file);
-  const response = await fetch("/api/admin/images", {
+  const { response, data } = await fetchJsonWithRetry("/api/admin/images", {
     method: "POST",
     headers: { "Content-Type": prepared.type || "application/octet-stream" },
     body: prepared
   });
-  const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "圖片上傳失敗");
   return data.imageUrl || "";
 }
@@ -490,15 +489,11 @@ function isTransientStatus(status) {
   return [502, 503, 504].includes(status);
 }
 
-async function postJsonWithRetry(url, payload, maxAttempts = 3) {
+async function fetchJsonWithRetry(url, options = {}, maxAttempts = 3) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const response = await fetch(url, options);
       const data = await response.json().catch(() => ({}));
       if (response.ok || !isTransientStatus(response.status) || attempt === maxAttempts) {
         return { response, data };
@@ -511,6 +506,14 @@ async function postJsonWithRetry(url, payload, maxAttempts = 3) {
     await wait(900 * attempt);
   }
   throw lastError;
+}
+
+async function postJsonWithRetry(url, payload, maxAttempts = 3) {
+  return fetchJsonWithRetry(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }, maxAttempts);
 }
 
 function renderProductOverview(market) {
@@ -648,7 +651,7 @@ marketFormEl?.addEventListener("submit", async (event) => {
   const formData = new FormData(marketFormEl);
   try {
     const imageUrl = await marketImageFromForm(marketFormEl, formData);
-    const response = await fetch("/api/admin/markets", {
+    const { response, data } = await fetchJsonWithRetry("/api/admin/markets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -658,7 +661,6 @@ marketFormEl?.addEventListener("submit", async (event) => {
         isActive: formData.get("isActive") === "on"
       })
     });
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       alert(data.message || "新增賣場失敗");
       return;
@@ -720,12 +722,11 @@ document.addEventListener("click", async (event) => {
       return;
     }
     const isActive = bulkActiveStatusButton.dataset.bulkActiveStatus === "true";
-    const response = await fetch("/api/admin/products/active-status", {
+    const { response, data } = await fetchJsonWithRetry("/api/admin/products/active-status", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productIds, isActive })
     });
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       alert(data.message || "批量更新失敗");
       return;
@@ -770,7 +771,11 @@ document.addEventListener("click", async (event) => {
 
   const marketId = event.target.dataset.deleteMarket;
   if (marketId && confirm("確定刪除這個賣場？")) {
-    await fetch(`/api/admin/markets/${marketId}`, { method: "DELETE" });
+    const { response, data } = await fetchJsonWithRetry(`/api/admin/markets/${marketId}`, { method: "DELETE" });
+    if (!response.ok) {
+      alert(data.message || "刪除賣場失敗");
+      return;
+    }
     isCreatingProduct = false;
     selectedProductId = "";
     await loadCatalog();
@@ -778,7 +783,11 @@ document.addEventListener("click", async (event) => {
 
   const productId = event.target.dataset.deleteProduct;
   if (productId && confirm("確定刪除這個商品？")) {
-    await fetch(`/api/admin/products/${productId}`, { method: "DELETE" });
+    const { response, data } = await fetchJsonWithRetry(`/api/admin/products/${productId}`, { method: "DELETE" });
+    if (!response.ok) {
+      alert(data.message || "刪除商品失敗");
+      return;
+    }
     isCreatingProduct = false;
     selectedProductId = "";
     await loadCatalog();
@@ -890,7 +899,7 @@ document.addEventListener("submit", async (event) => {
       return;
     }
 
-    await fetch(`/api/admin/markets/${marketId}`, {
+    const { response, data } = await fetchJsonWithRetry(`/api/admin/markets/${marketId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -900,6 +909,10 @@ document.addEventListener("submit", async (event) => {
         isActive: formData.get("isActive") === "on"
       })
     });
+    if (!response.ok) {
+      alert(data.message || "更新賣場失敗");
+      return;
+    }
 
     await loadCatalog();
   }
@@ -915,7 +928,7 @@ document.addEventListener("submit", async (event) => {
       const imageUrl = await productImageFromForm(event.target, formData);
       const variants = await collectVariantsWithImages(event.target.querySelector(".variant-editor"));
 
-      const response = await fetch(`/api/admin/products/${productId}`, {
+      const { response, data } = await fetchJsonWithRetry(`/api/admin/products/${productId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -929,7 +942,6 @@ document.addEventListener("submit", async (event) => {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
         alert(data.message || "儲存商品失敗");
         return;
       }
@@ -979,7 +991,7 @@ document.addEventListener("change", async (event) => {
   const uploader = event.target.closest(".image-uploader");
   const previewUrl = URL.createObjectURL(file);
   uploader.querySelector("[data-image-preview]").outerHTML =
-    `<span class="image-preview" data-image-preview><img src="${previewUrl}" alt="" onload="URL.revokeObjectURL(this.src)"></span>`;
+    `<span class="image-preview" data-image-preview><img src="${previewUrl}" alt="" onload="window.URL?.revokeObjectURL?.(this.src)"></span>`;
 });
 
 refreshCatalogEl.addEventListener("click", () => {
